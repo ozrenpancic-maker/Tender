@@ -22,8 +22,11 @@ dokumenata koje trebaš pripremiti i predati uz ponudu.
   naručitelj, CPV, vrijednost, proizvodi/usluge), uvoz putem CSV-a ili ručni unos, filtriranje po
   konkurentu/CPV-u/pojmu, te **AI analiza cijena i proizvoda** nad filtriranim podacima (raspon cijena,
   najčešći proizvodi, pozicioniranje ponude).
-- **Pretraga natječaja (EOJN RH / TED)** – planirana faza, vidi `/pretraga-natjecaja` za roadmap.
-  Automatsko preuzimanje dodjela ugovora s tih portala za sekciju "Konkurencija" je dio iste faze.
+- **Automatska pretraga natječaja** (`/pretraga-natjecaja`) – postaviš kriterije (CPV kodovi, ključne
+  riječi, raspon vrijednosti, županija), pretraga se pokreće preko **TED API-ja** (EU) i **scrapera za
+  EOJN RH**, rezultati se spremaju i mogu jednim klikom postati novi projekt (uz automatski predložen
+  naziv, naručitelj i rok). Ima gumb "Testiraj vezu" koji odmah pokaže je li dohvat uspio i zašto ako
+  nije — pogledaj **Ograničenja** ispod prije nego se osloniš na EOJN dio.
 
 ## Pokretanje lokalno
 
@@ -59,6 +62,10 @@ dokumenata koje trebaš pripremiti i predati uz ponudu.
 - **`src/lib/analyzeCompetitors.ts`** – poziv Claude-a za analizu cijena/proizvoda nad podacima o
   dodjelama ugovora.
 - **`src/lib/csv.ts`** – jednostavan CSV parser za uvoz podataka o dodjelama ugovora.
+- **`src/lib/providers/ted.ts`** i **`src/lib/providers/eojn.ts`** – dohvat natječaja s TED API-ja
+  (Expert Query Language upiti) i EOJN RH (HTML scraper), s obrambenim parsiranjem i dijagnostičkim
+  porukama umjesto tihog pada. Konfigurabilno preko `TED_API_BASE`, `TED_API_KEY`, `EOJN_BASE_URL`,
+  `EOJN_SEARCH_PATH` env varijabli.
 - Uploadane datoteke, predlošci tvrtke i generirani nacrti ponuda spremaju se lokalno u `uploads/`
   (izvan gita).
 
@@ -69,8 +76,15 @@ dokumenata koje trebaš pripremiti i predati uz ponudu.
   obrazaca naručitelja (ESPD, troškovnik) i dalje je potreban ručni unos u te obrasce.
 - Podaci o konkurenciji temelje se isključivo na **javno objavljenim** dodjelama ugovora (EOJN
   RH / TED "Obavijest o dodjeli ugovora"). Ponude koje nisu pobijedile nisu javne i nisu dostupne.
-- Automatsko preuzimanje s EOJN RH / TED portala (umjesto ručnog CSV uvoza) nije još implementirano —
-  vidi `/pretraga-natjecaja`.
+- **TED integracija je napisana prema javnoj dokumentaciji, ali nije uživo testirana** – ovaj razvojni
+  container nema izlazni pristup internetu (izvan dopuštenog popisa domena), pa endpoint/nazivi polja
+  TED API-ja nisu potvrđeni protiv stvarnog odgovora. Prvi put kad se pokrene s pravim internet
+  pristupom, provjeri "Testiraj vezu" na `/pretraga-natjecaja` — ako prijavi grešku parsiranja, popravak
+  je izoliran u `src/lib/providers/ted.ts`.
+- **EOJN RH nema poznat javni API** – scraper u `src/lib/providers/eojn.ts` je best-effort HTML
+  parsiranje koje **nije provjereno protiv stvarne stranice** (isti razlog kao gore) i vjerojatno će
+  trebati podešavanje selektora nakon prvog pokretanja. Prije korištenja u produkciji obavezno provjeri
+  Uvjete korištenja EOJN portala vezano uz automatizirani pristup.
 
 ## Napomena o sigurnosti
 

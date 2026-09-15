@@ -23,6 +23,7 @@ model Project {
   requirements    Requirement[]
   analyses        Analysis[]
   generatedOffers GeneratedOffer[]
+  sourceListing   TenderListing?
 }
 
 // Dokument koji je korisnik učitao (natječajna dokumentacija ili vlastiti dokument)
@@ -136,4 +137,41 @@ model CompetitorAward {
   sourceType   String      @default("manual") // eojn | ted | manual
   sourceUrl    String?
   createdAt    DateTime    @default(now())
+}
+
+// Kriteriji po kojima automatska pretraga filtrira nove natječaje na TED / EOJN RH (jedan singleton red)
+model SearchProfile {
+  id          String   @id @default(cuid())
+  cpvCodes    String? // CPV kodovi odvojeni zarezom, npr. "30190000,79800000"
+  keywords    String? // ključne riječi odvojene zarezom
+  minValue    Float?
+  maxValue    Float?
+  county      String? // lokacija / regija naručitelja
+  sourceTed   Boolean  @default(true)
+  sourceEojn  Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Natječaj pronađen automatskom pretragom na TED-u ili EOJN RH
+model TenderListing {
+  id             String    @id @default(cuid())
+  source         String // ted | eojn
+  externalId     String // jedinstveni ID obavijesti kod izvora
+  title          String
+  authority      String?
+  cpv            String?
+  publishedDate  DateTime?
+  deadline       DateTime?
+  estimatedValue Float?
+  currency       String    @default("EUR")
+  noticeType     String? // notice | award
+  url            String?
+  rawExcerpt     String? // isječak sirovog odgovora izvora, za dijagnostiku mapiranja polja
+  createdAt      DateTime  @default(now())
+
+  projectId String?  @unique
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@unique([source, externalId])
 }
