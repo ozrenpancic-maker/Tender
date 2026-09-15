@@ -9,6 +9,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       checklistItems: { orderBy: { createdAt: "asc" } },
       requirements: { orderBy: { createdAt: "asc" } },
       analyses: { orderBy: { createdAt: "desc" }, take: 1 },
+      generatedOffers: { orderBy: { createdAt: "desc" } },
     },
   });
 
@@ -23,3 +24,5 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   await prisma.project.delete({ where: { id: params.id } });
   return NextResponse.json({ ok: true });
 }
+
+export const dynamic = "force-dynamic";

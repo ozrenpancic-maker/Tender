@@ -22,6 +22,7 @@ model Project {
   checklistItems  ChecklistItem[]
   requirements    Requirement[]
   analyses        Analysis[]
+  generatedOffers GeneratedOffer[]
 }
 
 // Dokument koji je korisnik učitao (natječajna dokumentacija ili vlastiti dokument)
@@ -68,4 +69,71 @@ model Analysis {
   summary    String
   rawResponse String
   createdAt  DateTime @default(now())
+}
+
+// Profil tvrtke ponuditelja (jedan singleton red - aplikacija je jednokorisnička/jedna tvrtka)
+model CompanyProfile {
+  id           String   @id @default(cuid())
+  name         String
+  oib          String?
+  address      String?
+  contactEmail String?
+  contactPhone String?
+  iban         String?
+  description  String? // kratak opis djelatnosti, reference, iskustvo - koristi se u AI nacrtu ponude
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  templates CompanyTemplate[]
+}
+
+// Vlastiti predložak tvrtke (npr. obrazac ponude, troškovnik) koji AI koristi kao referencu pri sastavljanju nacrta
+model CompanyTemplate {
+  id               String         @id @default(cuid())
+  companyProfileId String
+  companyProfile   CompanyProfile @relation(fields: [companyProfileId], references: [id], onDelete: Cascade)
+  title            String
+  originalName     String
+  storedPath       String
+  mimeType         String
+  extractedText    String?
+  createdAt        DateTime       @default(now())
+}
+
+// AI generirani nacrt ponude za projekt, izvezen kao .docx
+model GeneratedOffer {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  originalName String
+  storedPath   String
+  createdAt    DateTime @default(now())
+}
+
+// Tvrtka konkurent koju korisnik želi pratiti
+model Competitor {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  notes     String?
+  createdAt DateTime @default(now())
+
+  awards CompetitorAward[]
+}
+
+// Javno dostupan podatak o dodjeli ugovora (iz EOJN RH / TED obavijesti o dodjeli, ili ručno/CSV uvezen)
+model CompetitorAward {
+  id           String      @id @default(cuid())
+  competitorId String?
+  competitor   Competitor? @relation(fields: [competitorId], references: [id], onDelete: SetNull)
+  winnerName   String // naziv ponuditelja koji je dobio ugovor (ako ne odgovara praćenom konkurentu)
+  authority    String?
+  cpv          String?
+  tenderTitle  String
+  value        Float?
+  currency     String      @default("EUR")
+  awardDate    DateTime?
+  productsText String? // opis proizvoda/usluga/stavki iz dodjele, slobodan tekst
+  sourceType   String      @default("manual") // eojn | ted | manual
+  sourceUrl    String?
+  createdAt    DateTime    @default(now())
 }

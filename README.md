@@ -12,8 +12,18 @@ dokumenata koje trebaš pripremiti i predati uz ponudu.
   - sažetak natječaja,
   - ključne zahtjeve (rok, procijenjenu vrijednost, kriterij odabira, uvjete sposobnosti…),
   - checklistu dokumenata za ponudu, grupiranu po kategoriji, s mogućnošću označavanja "pripremljeno".
-- **Pretraga natječaja (EOJN RH / TED)** i **automatsko generiranje ponude** – planirane sljedeće faze,
-  vidi `/pretraga-natjecaja` za roadmap.
+- **Profil tvrtke** (`/company`) – podaci tvrtke (OIB, adresa, IBAN, opis/reference) i vlastiti
+  predlošci (obrasci, troškovnik) koji se koriste u generiranju ponude.
+- **Nacrt ponude (.docx)** – AI na temelju analize natječaja, checkliste i profila tvrtke sastavlja
+  tekstualni dio ponude (uvodno pismo, izjave, tehnički opis) i izvozi ga kao Word dokument za daljnju
+  doradu. Ne popunjava službene obrasce naručitelja niti izmišlja cijene/činjenice — mjesta koja
+  nedostaju označava s `[DOPUNITI: ...]`.
+- **Praćenje konkurencije** (`/konkurencija`) – baza javno objavljenih dodjela ugovora (pobjednik,
+  naručitelj, CPV, vrijednost, proizvodi/usluge), uvoz putem CSV-a ili ručni unos, filtriranje po
+  konkurentu/CPV-u/pojmu, te **AI analiza cijena i proizvoda** nad filtriranim podacima (raspon cijena,
+  najčešći proizvodi, pozicioniranje ponude).
+- **Pretraga natječaja (EOJN RH / TED)** – planirana faza, vidi `/pretraga-natjecaja` za roadmap.
+  Automatsko preuzimanje dodjela ugovora s tih portala za sekciju "Konkurencija" je dio iste faze.
 
 ## Pokretanje lokalno
 
@@ -37,13 +47,30 @@ dokumenata koje trebaš pripremiti i predati uz ponudu.
 ## Arhitektura
 
 - **Next.js 14 (App Router) + TypeScript + Tailwind** – frontend i API rute u istom projektu.
-- **Prisma + SQLite** – `Project`, `Document`, `ChecklistItem`, `Requirement`, `Analysis` modeli
-  (vidi `prisma/schema.prisma`). SQLite je dovoljan za MVP; za produkciju je lako prebaciti na
-  Postgres promjenom `provider` i `DATABASE_URL`.
+- **Prisma + SQLite** – `Project`, `Document`, `ChecklistItem`, `Requirement`, `Analysis`,
+  `CompanyProfile`, `CompanyTemplate`, `GeneratedOffer`, `Competitor`, `CompetitorAward` modeli (vidi
+  `prisma/schema.prisma`). SQLite je dovoljan za MVP; za produkciju je lako prebaciti na Postgres
+  promjenom `provider` i `DATABASE_URL`.
 - **`src/lib/extractText.ts`** – izvlačenje teksta iz PDF/DOCX/TXT datoteka.
 - **`src/lib/analyze.ts`** – poziv Anthropic API-ja (Claude) sa strukturiranim promptom koji vraća
-  JSON (sažetak, zahtjevi, checklist).
-- Uploadane datoteke spremaju se lokalno u `uploads/<projectId>/` (izvan gita).
+  JSON (sažetak, zahtjevi, checklist) za analizu natječajne dokumentacije.
+- **`src/lib/generateOffer.ts`** – poziv Claude-a za nacrt teksta ponude + izgradnja `.docx` datoteke
+  (paket `docx`).
+- **`src/lib/analyzeCompetitors.ts`** – poziv Claude-a za analizu cijena/proizvoda nad podacima o
+  dodjelama ugovora.
+- **`src/lib/csv.ts`** – jednostavan CSV parser za uvoz podataka o dodjelama ugovora.
+- Uploadane datoteke, predlošci tvrtke i generirani nacrti ponuda spremaju se lokalno u `uploads/`
+  (izvan gita).
+
+## Ograničenja koja treba znati
+
+- Nacrt ponude je **novi** Word dokument sastavljen prema sadržaju tvojih predložaka, ne izmjena
+  izvorne .docx datoteke uz očuvanje njenog točnog formatiranja/polja. Za popunjavanje službenih
+  obrazaca naručitelja (ESPD, troškovnik) i dalje je potreban ručni unos u te obrasce.
+- Podaci o konkurenciji temelje se isključivo na **javno objavljenim** dodjelama ugovora (EOJN
+  RH / TED "Obavijest o dodjeli ugovora"). Ponude koje nisu pobijedile nisu javne i nisu dostupne.
+- Automatsko preuzimanje s EOJN RH / TED portala (umjesto ručnog CSV uvoza) nije još implementirano —
+  vidi `/pretraga-natjecaja`.
 
 ## Napomena o sigurnosti
 

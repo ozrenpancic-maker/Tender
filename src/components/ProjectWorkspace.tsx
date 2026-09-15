@@ -30,6 +30,12 @@ interface AnalysisDto {
   summary: string;
 }
 
+interface GeneratedOfferDto {
+  id: string;
+  originalName: string;
+  createdAt: string | Date;
+}
+
 interface ProjectDto {
   id: string;
   name: string;
@@ -39,6 +45,7 @@ interface ProjectDto {
   checklistItems: ChecklistItemDto[];
   requirements: RequirementDto[];
   analyses: AnalysisDto[];
+  generatedOffers: GeneratedOfferDto[];
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -55,6 +62,7 @@ export default function ProjectWorkspace({ project }: { project: ProjectDto }) {
   const [kind, setKind] = useState<"tender" | "own">("tender");
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [generatingOffer, setGeneratingOffer] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const tenderDocs = project.documents.filter((d) => d.kind === "tender");
@@ -106,6 +114,23 @@ export default function ProjectWorkspace({ project }: { project: ProjectDto }) {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       setError(data.error || "Analiza nije uspjela.");
+      return;
+    }
+
+    router.refresh();
+  }
+
+  async function handleGenerateOffer() {
+    setGeneratingOffer(true);
+    setError(null);
+
+    const res = await fetch(`/api/projects/${project.id}/offer`, { method: "POST" });
+
+    setGeneratingOffer(false);
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "Generiranje nacrta ponude nije uspjelo.");
       return;
     }
 
@@ -255,10 +280,46 @@ export default function ProjectWorkspace({ project }: { project: ProjectDto }) {
         </section>
       )}
 
-      <section className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
-        <h2 className="mb-1 text-base font-medium text-slate-700">4. Generiranje ponude (uskoro)</h2>
-        Kad je checklist gotov i dokumenti pripremljeni, ovdje će AI sastaviti nacrt ponude na temelju učitanih
-        vlastitih dokumenata tvrtke i zahtjeva natječaja.
+      <section className="rounded-lg border border-slate-200 bg-white p-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-medium">4. Nacrt ponude</h2>
+          <button
+            onClick={handleGenerateOffer}
+            disabled={generatingOffer || project.analyses.length === 0}
+            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          >
+            {generatingOffer ? "Sastavljam…" : "Generiraj nacrt ponude (.docx)"}
+          </button>
+        </div>
+        {project.analyses.length === 0 && (
+          <p className="mt-2 text-sm text-slate-400">Prvo pokreni AI analizu dokumentacije (korak 2).</p>
+        )}
+        <p className="mt-2 text-sm text-slate-500">
+          AI sastavlja tekstualni dio ponude (uvodno pismo, izjave, tehnički opis) na temelju profila tvrtke i
+          njenih predložaka. Ovo je nacrt za tvoju provjeru i dopunu — ne popunjava službene obrasce naručitelja
+          niti izmišlja cijene ili činjenice.{" "}
+          <a href="/company" className="text-brand-600 hover:underline">
+            Uredi profil tvrtke i predloške →
+          </a>
+        </p>
+        {project.generatedOffers.length > 0 && (
+          <ul className="mt-4 space-y-1 text-sm">
+            {project.generatedOffers.map((o) => (
+              <li key={o.id}>
+                📄{" "}
+                <a
+                  href={`/api/projects/${project.id}/offer/${o.id}/download`}
+                  className="text-brand-600 hover:underline"
+                >
+                  {o.originalName}
+                </a>{" "}
+                <span className="text-slate-400">
+                  ({new Date(o.createdAt).toLocaleString("hr-HR")})
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );

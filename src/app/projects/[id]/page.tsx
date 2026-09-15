@@ -10,6 +10,7 @@ export default async function ProjectPage({ params }: { params: { id: string } }
       checklistItems: { orderBy: { createdAt: "asc" } },
       requirements: { orderBy: { createdAt: "asc" } },
       analyses: { orderBy: { createdAt: "desc" }, take: 1 },
+      generatedOffers: { orderBy: { createdAt: "desc" } },
     },
   });
 

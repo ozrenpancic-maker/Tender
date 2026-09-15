@@ -28,3 +28,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ project }, { status: 201 });
 }
+
+export const dynamic = "force-dynamic";

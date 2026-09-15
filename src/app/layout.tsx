@@ -23,6 +23,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/pretraga-natjecaja" className="hover:text-brand-700">
                 Pretraga natječaja
               </Link>
+              <Link href="/konkurencija" className="hover:text-brand-700">
+                Konkurencija
+              </Link>
+              <Link href="/company" className="hover:text-brand-700">
+                Profil tvrtke
+              </Link>
             </nav>
           </div>
         </header>
