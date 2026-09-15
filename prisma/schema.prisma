@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Jedan natječaj / postupak javne nabave na kojem korisnik radi
+model Project {
+  id            String   @id @default(cuid())
+  name          String
+  authority     String? // naručitelj
+  deadline      DateTime?
+  notes         String?
+  status        String   @default("draft") // draft | analyzing | ready | submitted
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  documents       Document[]
+  checklistItems  ChecklistItem[]
+  requirements    Requirement[]
+  analyses        Analysis[]
+}
+
+// Dokument koji je korisnik učitao (natječajna dokumentacija ili vlastiti dokument)
+model Document {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind          String   @default("tender") // tender (dokumentacija natječaja) | own (dokument tvrtke)
+  originalName  String
+  storedPath    String
+  mimeType      String
+  extractedText String?
+  createdAt     DateTime @default(now())
+}
+
+// Stavka checklista - dokument/prilog koji je potrebno pripremiti za ponudu
+model ChecklistItem {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  category     String   @default("ostalo") // pravni | financijski | tehnicki | obrazac | ostalo
+  mandatory    Boolean  @default(true)
+  fulfilled    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+// Ključni izvučeni zahtjev natječaja (rok, kriterij, vrijednost...)
+model Requirement {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  label      String
+  value      String
+  createdAt  DateTime @default(now())
+}
+
+// Zapis jednog pokretanja AI analize nad dokumentacijom
+model Analysis {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  summary    String
+  rawResponse String
+  createdAt  DateTime @default(now())
+}
