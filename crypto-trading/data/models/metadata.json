@@ -3,7 +3,7 @@
     "horizon": "1h",
     "horizon_label": "1 sat",
     "n_examples": 7533,
-    "trained_at": 1795460423,
+    "trained_at": 1795461159,
     "feature_names": [
       "rsi14",
       "stoch_rsi14",
@@ -160,7 +160,7 @@
     "horizon": "4h",
     "horizon_label": "4 sata",
     "n_examples": 1431,
-    "trained_at": 1795460425,
+    "trained_at": 1795461160,
     "feature_names": [
       "rsi14",
       "stoch_rsi14",
@@ -326,7 +326,7 @@
     "horizon": "24h",
     "horizon_label": "24 sata",
     "n_examples": 8459,
-    "trained_at": 1795460426,
+    "trained_at": 1795461161,
     "feature_names": [
       "rsi14",
       "stoch_rsi14",
@@ -492,7 +492,7 @@
     "horizon": "7d",
     "horizon_label": "7 dana",
     "n_examples": 8441,
-    "trained_at": 1795460428,
+    "trained_at": 1795461163,
     "feature_names": [
       "rsi14",
       "stoch_rsi14",

@@ -8,3 +8,4 @@ beautifulsoup4>=4.12
 lightgbm>=4.7
 scikit-learn>=1.9
 joblib>=1.6
+shap>=0.54

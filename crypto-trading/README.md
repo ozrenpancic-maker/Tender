@@ -374,24 +374,46 @@ API nije imao NIKAKVU autentikaciju. Dodan je opcionalni `DASHBOARD_API_KEY` (vi
 postavljen (default), ponašanje je nepromijenjeno. Dashboard ima jednostavno polje za unos ključa
 (pamti se u localStorage preglednika).
 
-**Ono što ChatGPT-ova revizija ispravno navodi kao JOŠ NERIJEŠENO (nije popravljeno u ovom krugu,
-namjerno odgođeno - veći zahvati, manji prioritet s obzirom da svi AI modeli trenutno ipak vraćaju
-WAIT za sve horizonte)**:
-- Point-in-time dostupnost makro podataka (`macro_series` nema `published_at`/`available_at`,
-  samo `observed_date` - teoretski bi strategija mogla "znati" vrijednost prije nego je stvarno
-  objavljena, ovisno o izvoru).
-- Usporediv završni obračun likvidacije kad backtest završi s otvorenom pozicijom (i buy&hold i
-  aktivne strategije trenutno izvještavaju mark-to-market bez završnog izlaznog troška - dosljedno
-  između njih, ali blago naduvava apsolutne brojeve ako se tumače kao "gotovina da danas prodam").
-- Realne Coinbase EUR naknade/spread/minimalna veličina naloga kao zaseban scenarij (trenutno fiksno
-  0,4%+0,1% za sve).
-- `reasons_for`/`reasons_against` u `app/ml/engine.py` su heuristička interpretacija vrijednosti
-  značajki, NE stvarni doprinosi koje je LightGBM model koristio (trebao bi SHAP ili slično za tu
-  tvrdnju - vidi "AI Prediction Engine" iznad, već je ranije označeno kao mogući fazni 6 dodatak).
-- 1h/4h pokrivenost (~113 dana) je i dalje premala za procjenu kroz različite tržišne režime.
-- XRP puna povijest i dalje nedostaje u ovoj bazi.
-- Mrežni pozivi i Android APK nisu testirani u ovom okruženju (nema interneta) - samo statička
-  provjera koda.
+### Treća runda - preostale stavke s popisa (4 riješene, 3 blokirane sandboxom)
+
+- ✅ **Point-in-time dostupnost makro podataka** (`app/macro_store.py`, `data/schema_extra.sql`):
+  `macro_series` je imao samo `observed_date` (dan NA KOJI se podatak odnosi), ne dan kad je
+  STVARNO postao dostupan - teoretski curenje (strategija bi "znala" vrijednost prije objave).
+  Dodan `available_date` stupac (automatska migracija za postojeću bazu u `app/db.py`), izveden
+  kao `observed_date + LAG_DAYS[source]` (npr. FRED +1 dan, Google Trends +2 dana, dnevni
+  sentiment agregati +1 dan - jer se cijeli dan mora završiti prije agregacije). `load_series`
+  sada filtrira po `available_date`, ne `observed_date`. **NAPOMENA O POUZDANOSTI**: LAG_DAYS su
+  konzervativne procjene, NISU provjerene uživo protiv stvarnog kalendara objave svakog izvora
+  (nema pristupa internetu) - vidi dokumentaciju u `macro_store.py`.
+- ✅ **Usporediv završni obračun likvidacije** (`app/backtest.py`): equity curve (i za buy_hold i
+  za generičke strategije) sada na SVAKOJ točki računa stvarnu gotovinu da bi se likvidiralo SADA
+  (`sell_fill_price` + naknada), ne sirovu mark-to-market cijenu - ista konvencija kao ChatGPT-ov
+  `sim_hold`. Usput je nađena i popravljena mala nedosljednost: `run_buy_hold` je prije koristio
+  drugu (približno, ne identično jednaku) formulu za trošak kupnje nego `run_generic_backtest`.
+  Cross-validacija (`trend_guard`, BTC/ETH/SOL, 2025-2026) nepromijenjena - 102,41/151,94/96,76 do
+  centa, jer su ti specifični testovi završili bez otvorene pozicije.
+- ✅ **Realne naknade kao scenarij, ne fiksna pretpostavka** (`app/costs.py`, nova ruta
+  `/api/backtest/cost-sensitivity`, dashboard odjeljak 4 "Test osjetljivosti na naknade"): isti
+  backtest se sada može pokrenuti preko 5 imenovanih scenarija (zadano, Coinbase Advanced Trade
+  niski/visoki volumen, Coinbase "jednostavna" Buy/Sell tipka, pesimističan). **Konkretan nalaz**:
+  `trend_guard` na BTC/USDT 2025-26 je profitabilan na 4 od 5 scenarija, ali **gubi novac**
+  (85,54 € od 100 €) na scenariju "Coinbase jednostavna tipka" (~1,49% efektivni spread) - dokaz
+  da profitabilnost nekih strategija ovisi o tome koristi li se najjeftiniji način trgovanja, ne
+  samo o samoj strategiji. Orijentacijski brojevi, NISU uživo provjereni protiv trenutnog Coinbase
+  cjenika - vidi napomenu u `app/costs.py`.
+- ✅ **SHAP objašnjenja umjesto heuristike** (`app/ml/engine.py`): `reasons_for`/`reasons_against`
+  sada koriste `shap.TreeExplainer` nad stvarnim LightGBM modelom (izvučenim iz
+  `CalibratedClassifierCV` omota) za PRAVE doprinose značajki TOJ KONKRETNOJ predikciji, ne
+  interpretaciju vrijednosti značajki. Stara heuristika je ostala kao fallback (`reasons_method`
+  u odgovoru govori koja je metoda stvarno korištena) ako SHAP iz nekog razloga ne uspije.
+- ❌ **1h/4h pokrivenost (~113 dana)** i ❌ **XRP puna povijest** - oboje zahtijevaju NOVI stvarni
+  dohvat povijesti s Binancea; ovo razvojno okruženje nema pristup internetu, pa se ne mogu
+  stvarno riješiti ovdje. Pokreni `/api/binance-history/sync` (za XRP/duže 4h/1h serije) ili
+  `DOHVATI_XRP.cmd` iz ChatGPT-ovog paketa kad imaš internet.
+- ❌ **Mrežni pozivi i Android APK build** - provjereno: Gradle 8.14 postoji u ovom okruženju, ALI
+  Android SDK (compileSdk/build-tools) nije instaliran i preuzimanje bi trebalo pristup internetu
+  (vjerojatno blokiran isto kao i svi drugi vanjski API pozivi) - nisam ni pokušao, da ne trošim
+  vrijeme na siguran neuspjeh. I dalje samo statička provjera koda, ne stvarni build/test.
 
 ## Arhitektura
 

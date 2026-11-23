@@ -1,7 +1,7 @@
 """Generički dnevni backtest engine: odluka se donosi nakon zatvaranja svijeće i, nakon
 jednog dana zakašnjenja. To je ista konvencija vremena izvršenja kao u priloženom baznom testu."""
 from app.candles import Candle, load_candles
-from app.costs import buy_fill_price, sell_fill_price, FEE
+from app.costs import COST_SCENARIOS, buy_fill_price, sell_fill_price, FEE, SLIPPAGE
 from app.macro_store import load_series
 from app.strategies import GENERIC_STRATEGIES
 from app.strategies.base import StrategyContext
@@ -16,6 +16,8 @@ def run_generic_backtest(
     aux: dict | None = None,
     series: dict | None = None,
     start_ts: int | None = None,
+    fee: float = FEE,
+    slippage: float = SLIPPAGE,
 ) -> dict:
     """`candles` može sadržavati dodatne "zagrijavajuće" svijeće PRIJE `start_ts` (da indikatori s
     dugim lookbackom, npr. SMA200, imaju povijest od prvog dana traženog razdoblja, ne tek nakon
@@ -52,21 +54,26 @@ def run_generic_backtest(
             continue  # zagrijavanje: indikatori se pune, ali se ništa stvarno ne trguje/broji
 
         if decision == "buy" and not in_position:
-            fill = buy_fill_price(next_candle.open)
-            position_base = (cash * (1 - FEE)) / fill
+            fill = buy_fill_price(next_candle.open, slippage)
+            position_base = (cash * (1 - fee)) / fill
             entry_cash = cash
             cash = 0.0
             in_position = True
         elif decision == "sell" and in_position:
-            fill = sell_fill_price(next_candle.open)
-            cash = position_base * fill * (1 - FEE)
+            fill = sell_fill_price(next_candle.open, slippage)
+            cash = position_base * fill * (1 - fee)
             position_base = 0.0
             in_position = False
             trades += 1
             if cash > entry_cash:
                 winning_trades += 1
 
-        equity = cash + position_base * next_candle.close
+        # Equity = STVARNA gotovina da bi se pozicija likvidirala SADA (sell_fill_price + FEE), ne
+        # sirova mark-to-market cijena - nađeno u ChatGPT-ovoj neovisnoj reviziji: bez ovoga
+        # usporedba "koliko stvarno imam" blago precjenjuje vrijednost dok je pozicija otvorena,
+        # posebno na kraju testa ako se nikad ne prodalo. Ista konvencija kao ChatGPT-ov sim_hold.
+        liquidated_value = position_base * sell_fill_price(next_candle.close, slippage) * (1 - fee) if position_base else 0.0
+        equity = cash + liquidated_value
         peak = max(peak, equity)
         max_drawdown = max(max_drawdown, 1 - equity / peak if peak > 0 else 0)
         equity_curve.append({"at": next_candle.opened_at, "equity": round(equity, 4)})
@@ -85,12 +92,20 @@ def run_generic_backtest(
     }
 
 
-def run_buy_hold(candles: list[Candle], starting_balance: float) -> dict:
+def run_buy_hold(candles: list[Candle], starting_balance: float, fee: float = FEE, slippage: float = SLIPPAGE) -> dict:
     """Referentna točka: kupi na prvoj svijeći, drži do kraja. Svaka aktivna strategija treba
-    nadmašiti ovo da bi imala smisla (uz dodatni rizik aktivnog trgovanja)."""
-    fill = buy_fill_price(candles[0].open) * (1 + FEE)
-    position_base = starting_balance / fill
-    equity_curve = [{"at": c.opened_at, "equity": round(position_base * c.close, 4)} for c in candles]
+    nadmašiti ovo da bi imala smisla (uz dodatni rizik aktivnog trgovanja).
+
+    Trošak kupnje/prodaje mora biti IDENTIČNA formula kao u `run_generic_backtest` (nađeno u
+    ChatGPT-ovoj neovisnoj reviziji dok je provjeravao zašto se buy_hold brojevi ne poklapaju do
+    centa: ova funkcija je prije množila `buy_fill_price(open) * (1+FEE)` - approksimacija bliska
+    `(1-FEE)` ali NE identična, davala je sustavno malo drugačiji rezultat od ostatka backtesta).
+    Equity curve = stvarna gotovina da bi se likvidiralo SADA (sell_fill_price + FEE) na svakoj
+    točki, ne sirova mark-to-market cijena - ista konvencija kao ChatGPT-ov sim_hold."""
+    position_base = (starting_balance * (1 - fee)) / buy_fill_price(candles[0].open, slippage)
+    equity_curve = [
+        {"at": c.opened_at, "equity": round(position_base * sell_fill_price(c.close, slippage) * (1 - fee), 4)} for c in candles
+    ]
     peak = starting_balance
     max_drawdown = 0.0
     for point in equity_curve:
@@ -116,14 +131,18 @@ def run_backtest(
     params: dict,
     starting_balance: float,
     interval_min: int = 1440,
+    fee: float = FEE,
+    slippage: float = SLIPPAGE,
 ) -> dict:
     if strategy_key == "buy_hold":
         candles = load_candles(conn, "binance", pair, interval_min, start_ts, end_ts)
         if len(candles) < 2:
             raise ValueError(f"Nema dovoljno svijeća za {pair} u traženom razdoblju.")
-        return run_buy_hold(candles, starting_balance)
+        return run_buy_hold(candles, starting_balance, fee, slippage)
 
     if strategy_key == "baseline_2pct":
+        # Namjerno NEMA fee/slippage override - ovo reproducira TOČAN rezultat priloženog
+        # izvještaja (vidi "Kako je provjereno"), promjena troškovnog modela bi to pokvarila.
         if pair != "BTC/EUR":
             raise ValueError("Bazno pravilo iz izvještaja definirano je samo za BTC/EUR.")
         day = 86400
@@ -162,4 +181,30 @@ def run_backtest(
             )
         series[spec["series_id"]] = points
 
-    return run_generic_backtest(candles, strategy_key, params, starting_balance, aux, series, start_ts)
+    return run_generic_backtest(candles, strategy_key, params, starting_balance, aux, series, start_ts, fee, slippage)
+
+
+def run_cost_sensitivity(
+    conn,
+    strategy_key: str,
+    pair: str,
+    start_ts: int,
+    end_ts: int,
+    params: dict,
+    starting_balance: float,
+    interval_min: int = 1440,
+) -> dict:
+    """Pokreće ISTI backtest preko svih COST_SCENARIOS (vidi app/costs.py) - test osjetljivosti na
+    pretpostavku o naknadama/slippageu, nađeno kao nedostatak u ChatGPT-ovoj neovisnoj reviziji
+    ("realne naknade kao scenarij, ne fiksna pretpostavka"). Vraća {scenario_key: rezultat}."""
+    results = {}
+    for key, scenario in COST_SCENARIOS.items():
+        try:
+            r = run_backtest(
+                conn, strategy_key, pair, start_ts, end_ts, params, starting_balance, interval_min,
+                fee=scenario["fee"], slippage=scenario["slippage"],
+            )
+            results[key] = {"label": scenario["label"], "fee": scenario["fee"], "slippage": scenario["slippage"], **r}
+        except ValueError as err:
+            results[key] = {"label": scenario["label"], "error": str(err)}
+    return results

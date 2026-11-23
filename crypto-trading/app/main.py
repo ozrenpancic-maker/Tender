@@ -113,6 +113,32 @@ def backtest(req: BacktestRequest):
         conn.close()
 
 
+@app.get("/api/cost-scenarios")
+def cost_scenarios():
+    from app.costs import COST_SCENARIOS
+
+    return {"scenarios": COST_SCENARIOS}
+
+
+@app.post("/api/backtest/cost-sensitivity")
+def backtest_cost_sensitivity(req: BacktestRequest):
+    try:
+        start_ts = int(datetime.datetime.fromisoformat(req.start_date).replace(tzinfo=datetime.timezone.utc).timestamp())
+        end_ts = int(datetime.datetime.fromisoformat(req.end_date).replace(tzinfo=datetime.timezone.utc).timestamp())
+    except ValueError as err:
+        raise HTTPException(400, f"Neispravan datum: {err}")
+
+    conn = db.get_connection()
+    try:
+        from app.backtest import run_cost_sensitivity
+
+        return run_cost_sensitivity(
+            conn, req.strategy, req.pair, start_ts, end_ts, req.params, req.starting_balance, req.interval_min
+        )
+    finally:
+        conn.close()
+
+
 # ---------- Optimizacija (in-sample / out-of-sample) ----------
 
 class OptimizeRequest(BaseModel):

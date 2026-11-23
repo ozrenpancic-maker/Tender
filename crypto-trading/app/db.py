@@ -18,6 +18,16 @@ def ensure_schema() -> None:
     conn = get_connection()
     try:
         conn.executescript(EXTRA_SCHEMA.read_text(encoding="utf-8"))
+        _migrate(conn)
         conn.commit()
     finally:
         conn.close()
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """CREATE TABLE IF NOT EXISTS ne dodaje nove stupce na već postojeću tablicu - ovo je za takve
+    slučajeve (npr. `available_date` dodan u macro_series nakon što je tablica već postojala)."""
+    try:
+        conn.execute("ALTER TABLE macro_series ADD COLUMN available_date TEXT NOT NULL DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass  # stupac već postoji

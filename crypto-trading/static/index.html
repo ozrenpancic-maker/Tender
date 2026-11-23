@@ -165,7 +165,18 @@
           <input id="btParams" value="{}" style="width:260px" />
         </div>
         <button class="secondary" id="btRunOne">Pokreni samo ovu</button>
+        <button class="secondary" id="btCostSensitivity">Test osjetljivosti na naknade</button>
       </div>
+      <p class="muted" style="margin-top:8px">
+        Isti backtest preko nekoliko pretpostavki o naknadama/slippageu (zadano, Coinbase Advanced
+        Trade niski/visoki volumen, Coinbase "jednostavna" Buy/Sell tipka, pesimističan scenarij) -
+        orijentacijski brojevi, NISU uživo provjereni protiv trenutnog Coinbase cjenika. Profitabilnost
+        koja ovisi o tome jesi li baš na najjeftinijoj razini naknada nije pouzdana prednost.
+      </p>
+      <table id="costSensTable" style="display:none">
+        <thead><tr><th>Scenarij</th><th>Naknada</th><th>Slippage</th><th>Završni saldo</th><th>Max. pad</th></tr></thead>
+        <tbody></tbody>
+      </table>
     </details>
   </section>
 

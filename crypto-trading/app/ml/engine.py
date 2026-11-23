@@ -73,9 +73,45 @@ def _category(score: int) -> str:
     return "WAIT"
 
 
-def _reasons(features: dict) -> tuple[list[str], list[str]]:
+def _underlying_lgbm(model):
+    """Izvlači stvarni LGBMClassifier iz CalibratedClassifierCV(FrozenEstimator(...)) omota -
+    treba za SHAP (koji računa doprinose PRAVOG modela, ne kalibracijskog sloja)."""
+    try:
+        return model.calibrated_classifiers_[0].estimator.estimator
+    except (AttributeError, IndexError):
+        return None
+
+
+def _shap_reasons(model, x_row: list[float]) -> tuple[list[str], list[str]] | None:
+    """PRAVI doprinosi značajki stvarnom LightGBM modelu za OVU konkretnu predikciju (ne
+    heuristika) - nađeno kao nedostatak u ChatGPT-ovoj neovisnoj reviziji: `reasons_for`/
+    `reasons_against` su prije bili samo interpretacija vrijednosti značajki, ne stvarni doprinosi
+    koje je model koristio. Vraća None ako SHAP iz nekog razloga ne uspije (poziva se fallback na
+    _heuristic_reasons)."""
+    try:
+        import numpy as np
+        import shap
+
+        lgbm = _underlying_lgbm(model)
+        if lgbm is None:
+            return None
+        explainer = shap.TreeExplainer(lgbm)
+        shap_values = explainer.shap_values(np.array([x_row]))  # (1, n_features, n_classes)
+        up_idx = CLASSES.index("up")
+        contributions = list(zip(FEATURE_NAMES, shap_values[0, :, up_idx]))
+        contributions.sort(key=lambda c: c[1], reverse=True)
+        positives = [f"{name} doprinosi 'up' (SHAP {val:+.3f})" for name, val in contributions if val > 0][:5]
+        negatives = [f"{name} doprinosi 'down/sideways' (SHAP {val:+.3f})" for name, val in reversed(contributions) if val < 0][:5]
+        return positives, negatives
+    except Exception:
+        return None
+
+
+def _heuristic_reasons(features: dict) -> tuple[list[str], list[str]]:
     """Jednostavna, provjerljiva (ne SHAP) interpretacija ključnih značajki u razloge na
-    hrvatskom - svaki razlog je izravno izveden iz vrijednosti značajke s dokumentiranim pragom."""
+    hrvatskom - svaki razlog je izravno izveden iz vrijednosti značajke s dokumentiranim pragom.
+    Koristi se SAMO kao fallback ako SHAP ne uspije (vidi _shap_reasons) - označen je kao takav u
+    odgovoru preko `reasons_method`."""
     positives, negatives = [], []
     if features["rsi14"] is not None:
         if features["rsi14"] < 30:
@@ -201,12 +237,20 @@ def compute_prediction(pair: str, horizon: str) -> dict:
 
     score = _ai_score(probs)
     category = _category(score)
-    positives, negatives = _reasons(last)
+    x_row = X[0]
+    shap_result = _shap_reasons(model, x_row)
+    if shap_result is not None:
+        positives, negatives = shap_result
+        reasons_method = "shap"
+    else:
+        positives, negatives = _heuristic_reasons(last)
+        reasons_method = "heuristic_fallback"
 
     return {
         **base,
         "decision": category,
         "ai_score": score,
+        "reasons_method": reasons_method,
         "p_up": round(probs["up"], 4),
         "p_down": round(probs["down"], 4),
         "p_sideways": round(probs["sideways"], 4),

@@ -144,6 +144,45 @@ document.getElementById("btRunOne").addEventListener("click", async () => {
   renderBacktestChart([r]);
 });
 
+document.getElementById("btCostSensitivity").addEventListener("click", async () => {
+  const pair = document.getElementById("btPair").value;
+  const start_date = document.getElementById("btStart").value;
+  const end_date = document.getElementById("btEnd").value;
+  const starting_balance = Number(document.getElementById("btBalance").value);
+  const strategy = document.getElementById("btStrategy").value;
+  let params = {};
+  try {
+    params = JSON.parse(document.getElementById("btParams").value || "{}");
+  } catch {
+    alert("Parametri nisu valjan JSON.");
+    return;
+  }
+  const results = await api("/api/backtest/cost-sensitivity", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ strategy, pair, start_date, end_date, starting_balance, params }),
+  });
+  const table = document.getElementById("costSensTable");
+  const tbody = table.querySelector("tbody");
+  tbody.innerHTML = "";
+  for (const [key, r] of Object.entries(results)) {
+    const tr = document.createElement("tr");
+    if (r.error) {
+      tr.innerHTML = `<td>${r.label}</td><td colspan="4" class="muted">${r.error}</td>`;
+    } else {
+      tr.innerHTML = `
+        <td>${r.label}</td>
+        <td>${(r.fee * 100).toFixed(2)}%</td>
+        <td>${(r.slippage * 100).toFixed(2)}%</td>
+        <td>${fmtEur(r.final_balance)}</td>
+        <td>${fmtPct(r.max_drawdown_pct)}</td>
+      `;
+    }
+    tbody.appendChild(tr);
+  }
+  table.style.display = "table";
+});
+
 function renderBacktestTable(results, startingBalance) {
   const sorted = [...results].sort((a, b) => b.final_balance - a.final_balance);
   const table = document.getElementById("btTable");
