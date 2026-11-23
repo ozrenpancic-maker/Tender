@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app import binance_history_client, coinbase_client, config, db, equity_client, live_engine, paper_engine
+from app import binance_history_client, coinbase_client, db, equity_client, paper_engine
 from app.backtest import run_backtest
 from app.candles import available_pairs
 from app.macro_clients import MACRO_CLIENTS, all_labels, test_all_connections
@@ -21,7 +21,6 @@ app = FastAPI(title="Kripto trgovanje - istraživački MVP")
 def on_startup():
     db.ensure_schema()
     paper_engine.resume_running_on_startup()
-    # Live runovi se NAMJERNO ne nastavljaju automatski nakon restarta servera - vidi README.
 
 
 # ---------- Strategije / parovi ----------
@@ -308,55 +307,6 @@ def _run_summary(conn, run: dict) -> dict:
     run["current_equity_eur"] = last_point["equity_eur"] if last_point else run["starting_balance_eur"]
     run["last_update_at"] = last_point["at"] if last_point else None
     return run
-
-
-# ---------- Live trading (isključeno po defaultu - vidi README) ----------
-
-@app.get("/api/live/status")
-def live_status():
-    return {
-        "enabled": config.LIVE_TRADING_ENABLED,
-        "max_position_eur": config.LIVE_MAX_POSITION_EUR,
-        "daily_loss_limit_eur": config.LIVE_DAILY_LOSS_LIMIT_EUR,
-    }
-
-
-@app.post("/api/live/start")
-def live_start(req: StartRunRequest):
-    try:
-        run_id = live_engine.start_live_run(req.strategy, req.params, req.pair)
-        return {"run_id": run_id}
-    except (ValueError, live_engine.LiveTradingDisabled) as err:
-        raise HTTPException(400, str(err))
-
-
-@app.post("/api/live/{run_id}/stop")
-def live_stop(run_id: int):
-    live_engine.stop_live_run(run_id)
-    return {"ok": True}
-
-
-@app.get("/api/live/runs")
-def live_runs():
-    conn = db.get_connection()
-    try:
-        rows = conn.execute("SELECT * FROM paper_run WHERE mode='live' ORDER BY started_at DESC").fetchall()
-        return {"runs": [dict(r) for r in rows]}
-    finally:
-        conn.close()
-
-
-@app.get("/api/live/{run_id}")
-def live_detail(run_id: int):
-    conn = db.get_connection()
-    try:
-        run = conn.execute("SELECT * FROM paper_run WHERE id=? AND mode='live'", (run_id,)).fetchone()
-        if not run:
-            raise HTTPException(404, "Run nije pronađen.")
-        orders = conn.execute("SELECT * FROM live_order WHERE run_id=? ORDER BY created_at", (run_id,)).fetchall()
-        return {"run": dict(run), "orders": [dict(o) for o in orders]}
-    finally:
-        conn.close()
 
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

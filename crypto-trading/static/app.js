@@ -38,7 +38,6 @@ async function init() {
 
   fillSelect("btPair", pairs);
   fillSelect("ppPair", pairs.filter((p) => p !== "BTC/EUR" || true));
-  fillSelect("lvPair", pairs);
   fillSelect("optPair", pairs);
   fillSelect(
     "btStrategy",
@@ -56,15 +55,7 @@ async function init() {
     tradable.map((s) => s.key),
     tradable.reduce((acc, s) => ({ ...acc, [s.key]: s.label }), {}),
   );
-  fillSelect(
-    "lvStrategy",
-    tradable.map((s) => s.key),
-    tradable.reduce((acc, s) => ({ ...acc, [s.key]: s.label }), {}),
-  );
-
-  await refreshLiveStatus();
   await refreshPaperRuns();
-  await refreshLiveRuns();
   await renderMacroSyncRows();
 }
 
@@ -435,73 +426,6 @@ async function showPaperDetail(runId) {
       .join("")}</tbody>`;
     el.appendChild(list);
   }
-}
-
-// ---------- Live trading ----------
-
-document.getElementById("lvConfirm").addEventListener("change", (e) => {
-  document.getElementById("lvStart").disabled = !e.target.checked;
-});
-
-document.getElementById("lvStart").addEventListener("click", async () => {
-  const strategy = document.getElementById("lvStrategy").value;
-  const pair = document.getElementById("lvPair").value;
-  try {
-    await api("/api/live/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ strategy, pair }),
-    });
-    refreshLiveRuns();
-  } catch (err) {
-    alert(err.message);
-  }
-});
-
-async function refreshLiveStatus() {
-  const status = await api("/api/live/status");
-  const banner = document.getElementById("liveBanner");
-  const detailBanner = document.getElementById("liveDetailBanner");
-  const form = document.getElementById("liveStartForm");
-
-  if (status.enabled) {
-    banner.className = "banner danger";
-    banner.innerHTML = `⚠️ Live trgovanje je UKLJUČENO (LIVE_TRADING_ENABLED=true). Max po nalogu: ${fmtEur(
-      status.max_position_eur,
-    )}. Ovo šalje prave naloge s pravim novcem.`;
-    detailBanner.innerHTML = "";
-    form.style.display = "flex";
-  } else {
-    banner.className = "banner ok";
-    banner.innerHTML = "✓ Live trgovanje je isključeno. Sve što radiš je backtest ili paper trading (bez pravog novca).";
-    detailBanner.innerHTML =
-      '<p class="muted">Live trgovanje je namjerno isključeno dok ga ručno ne uključiš u .env (LIVE_TRADING_ENABLED=true) nakon što si zadovoljan/na paper trading rezultatima. Vidi README.</p>';
-    form.style.display = "none";
-  }
-}
-
-async function refreshLiveRuns() {
-  const { runs } = await api("/api/live/runs");
-  const table = document.getElementById("lvTable");
-  const tbody = table.querySelector("tbody");
-  tbody.innerHTML = "";
-  for (const run of runs) {
-    const label = (STRATEGIES.find((s) => s.key === run.strategy) || {}).label || run.strategy;
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${run.id}</td><td>${label}</td><td>${run.pair}</td><td>${run.status}</td><td></td>`;
-    if (run.status === "running") {
-      const stopBtn = document.createElement("button");
-      stopBtn.className = "danger-btn";
-      stopBtn.textContent = "Zaustavi";
-      stopBtn.onclick = async () => {
-        await api(`/api/live/${run.id}/stop`, { method: "POST" });
-        refreshLiveRuns();
-      };
-      tr.querySelector("td:last-child").appendChild(stopBtn);
-    }
-    tbody.appendChild(tr);
-  }
-  table.style.display = runs.length ? "table" : "none";
 }
 
 // ---------- Tvoj portfolio (Binance povijest proizvoljnih parova) ----------

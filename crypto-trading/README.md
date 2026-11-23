@@ -242,8 +242,6 @@ razdoblja (2022–2026, po godinama, uključujući medvjeđe tržište 2022.). N
 - **`app/paper_engine.py`** — pozadinska nit po pokrenutom runu, svakih 5 min provjerava je li
   stigla nova zatvorena dnevna svijeća, simulira trgovinu po živoj cijeni (isti troškovni model kao
   backtest), stanje uvijek rekonstruira iz zabilježenih trgovina (preživi restart servera).
-- **`app/live_engine.py`** — identična logika, ali šalje prave naloge. Vidi sigurnosne mehanizme
-  ispod.
 - **`static/`** — dashboard (čisti HTML/CSS/JS, bez vanjskih ovisnosti, radi i bez interneta osim
   za Coinbase/Stooq pozive).
 
@@ -253,7 +251,7 @@ razdoblja (2022–2026, po godinama, uključujući medvjeđe tržište 2022.). N
 cd crypto-trading
 python3 -m venv .venv && source .venv/bin/activate   # preporučeno - izbjegava sukobe sa sustavskim Python paketima
 pip install -r requirements.txt
-cp .env.example .env   # po potrebi uredi (Coinbase ključ, live postavke)
+cp .env.example .env   # po potrebi uredi (opcionalni ključevi za makro/sentiment izvore)
 uvicorn app.main:app --reload --port 8010
 ```
 
@@ -305,42 +303,24 @@ testirane** — ovo razvojno okruženje nema izlazni pristup internetu. Prije st
 2. Klikni "Testiraj vezu" u oba odjeljka (Wall Street i Coinbase) — ako jave grešku, popravak je
    izoliran u `app/coinbase_client.py` odnosno `app/equity_client.py` (endpoint, format odgovora,
    simboli poput `^spx`/`^dji`/`^ndq`).
-3. Pokreni paper trading i prati barem nekoliko dana/tjedana prije nego razmišljaš o live modu.
+3. Pokreni paper trading i prati barem nekoliko dana/tjedana prije nego vjeruješ signalima.
 
-## Sigurnosni mehanizmi za live trgovanje
+## Isključivo savjetnik/simulator (KriptoMVP 4.4 nepromjenjiva pravila)
 
-Live trgovanje je **isključeno po defaultu** i namjerno zahtijeva više koraka da se uključi:
-
-1. `.env`: `LIVE_TRADING_ENABLED=false` po defaultu. Mora se ručno postaviti na `true`.
-2. `.env`: `LIVE_MAX_POSITION_EUR` ograničava koliko EUR jedan "buy" nalog smije potrošiti - mora
-   biti > 0, inače `live_engine` odbija pokrenuti run.
-3. `.env`: `LIVE_DAILY_LOSS_LIMIT_EUR` - ako dnevni (od ponoći UTC) neto gubitak premaši ovaj iznos,
-   run se automatski zaustavlja (novi "buy" nalozi se odbijaju, otvorena pozicija se još uvijek
-   smije zatvoriti). Ako odgovor Coinbasea ne sadrži očekivano polje za izračun gubitka, sustav
-   **iz opreza pretpostavlja da je limit probijen** i zaustavlja run, umjesto da tiho nastavi.
-4. Dashboard ne nudi "Pokreni live trgovanje" gumb dok ručno ne potvrdiš checkbox da razumiješ da
-   se koristi pravi novac.
-5. Live runovi se **ne nastavljaju automatski** nakon restarta servera (za razliku od paper
-   runova) - potrebno ih je ručno ponovno pokrenuti. Ovo je namjerno, ne propust.
-6. API ključ za Coinbase napravi s dopuštenjem **samo za trgovanje**, nikad za podizanje sredstava
-   ("withdraw"/"transfer") - tako je šteta u slučaju kompromitacije ključa ograničena.
-
-Nijedan od ovih mehanizama nije zamjena za tvoju vlastitu procjenu rizika. Ovo je razvojni kod,
-nije uživo testiran protiv pravog Coinbase računa, i trgovanje kriptovalutama može dovesti do
-potpunog gubitka uloženih sredstava.
+Aplikacija **nikada ne izvršava prave naloge** i ne traži Coinbase trgovačke (autenticirane) API
+ključeve niti pristup računu/novčaniku - ta mogućnost (`app/live_engine.py`, autenticirani dio
+`app/coinbase_client.py`, `/api/live/*` rute, dashboard sekcija "Live trgovanje") je namjerno
+potpuno uklonjena iz koda, ne samo isključena zastavicom - vidi git povijest ako ti treba za
+referencu. Koristi se isključivo javni, read-only Coinbase cjenovni feed (bez ključa), za paper
+trading i backtest.
 
 ## Ograničenja koja treba znati
 
 - Strategije su long-only na spotu (kupi/drži/prodaj) - nema shortanja ni poluge.
-- Paper i live trgovanje donose odluke na dnevnim svijećama dohvaćenim uživo s Coinbasea, ne iz
-  statične `data/kripto.sqlite` baze (ta baza se koristi samo za backtest).
+- Paper trading donosi odluke na dnevnim svijećama dohvaćenim uživo s Coinbasea, ne iz statične
+  `data/kripto.sqlite` baze (ta baza se koristi samo za backtest).
 - `dip_buy_volume` i `rsi_meanrev` su u jedinom dosad pokrenutom testu izgubili novac - uključene
   su kao alat za daljnje istraživanje, ne kao preporuka.
-- Format Coinbase Advanced Trade API odgovora (posebno polja u odgovoru na nalog korištena za
-  izračun dnevnog P&L-a: `filled_value` / `total_value_after_fees`) nije potvrđen uživo - ako se
-  pokaže da polje ne postoji, `LIVE_DAILY_LOSS_LIMIT_EUR` provjera će (namjerno, fail-safe)
-  zaustaviti run umjesto da ga tiho zaobiđe; svejedno provjeri `app/live_engine.py` prvom prilikom
-  s pravim pristupom.
 - "Wall Street"/zlato podaci pokrivaju tri indeksa i zlato preko Stooq-a, dnevna rezolucija. Stooq
   simboli (`^spx`, `^dji`, `^ndq`, `xauusd`) nisu uživo potvrđeni - ako "Testiraj vezu" javi grešku
   za neki od njih, ispravi simbol u `app/equity_client.py` (`INDEX_SYMBOLS`).

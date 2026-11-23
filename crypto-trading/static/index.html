@@ -17,12 +17,12 @@
 <body>
 <header>
   <h1>Kripto trgovanje — istraživački MVP</h1>
-  <p>Backtest i usporedba strategija na povijesnim podacima, zatim paper trading na živim cijenama. Live trgovanje pravim novcem je posebno označeno i isključeno po defaultu.</p>
+  <p>Backtest i usporedba strategija na povijesnim podacima, zatim paper trading na živim cijenama. Isključivo savjetnik/simulator - aplikacija ne šalje prave naloge ni s jednim coinom.</p>
 </header>
 <main>
 
   <section id="liveStatusSection">
-    <div id="liveBanner" class="banner warn">Provjeravam status live trgovanja…</div>
+    <div id="liveBanner" class="banner ok">✓ Isključivo savjetnik/simulator - nema koda koji šalje prave naloge niti traži Coinbase trgovačke API ključeve.</div>
   </section>
 
   <section>
@@ -255,27 +255,12 @@
   </section>
 
   <section>
-    <h2>9. Live trgovanje (pravi novac)</h2>
-    <div id="liveDetailBanner"></div>
-    <div class="row" id="liveStartForm" style="display:none">
-      <div class="field">
-        <label>Strategija</label>
-        <select id="lvStrategy"></select>
-      </div>
-      <div class="field">
-        <label>Par</label>
-        <select id="lvPair"></select>
-      </div>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px">
-        <input type="checkbox" id="lvConfirm" />
-        Razumijem da ovo šalje prave naloge s pravim novcem na mom Coinbase računu
-      </label>
-      <button class="danger-btn" id="lvStart" disabled>Pokreni live trgovanje</button>
-    </div>
-    <table id="lvTable" style="display:none">
-      <thead><tr><th>#</th><th>Strategija</th><th>Par</th><th>Status</th><th>Akcija</th></tr></thead>
-      <tbody></tbody>
-    </table>
+    <h2>9. Live trgovanje</h2>
+    <p class="muted">
+      Namjerno uklonjeno (KriptoMVP 4.4 nepromjenjiva pravila) - aplikacija je isključivo savjetnik
+      i simulator. Ne postoji kod koji šalje prave naloge niti traži Coinbase trgovačke API
+      ključeve ili pristup računu/novčaniku. Koristi "Paper trading" (odjeljak 8) za simulaciju.
+    </p>
   </section>
 
 </main>

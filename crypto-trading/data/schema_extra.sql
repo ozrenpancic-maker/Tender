@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS paper_run (
     stopped_at INTEGER,
     starting_balance_eur REAL NOT NULL,
     status TEXT NOT NULL DEFAULT 'running', -- running | stopped
-    mode TEXT NOT NULL DEFAULT 'paper', -- paper | live
+    mode TEXT NOT NULL DEFAULT 'paper', -- uvijek 'paper' - aplikacija je savjetnik/simulator, nikad ne šalje prave naloge
     last_evaluated_candle_at INTEGER
 );
 
@@ -30,18 +30,6 @@ CREATE TABLE IF NOT EXISTS paper_equity_point (
     equity_eur REAL NOT NULL,
     price REAL NOT NULL,
     PRIMARY KEY (run_id, at)
-);
-
-CREATE TABLE IF NOT EXISTS live_order (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    run_id INTEGER,
-    side TEXT NOT NULL CHECK (side IN ('buy', 'sell')),
-    pair TEXT NOT NULL,
-    requested_eur REAL,
-    coinbase_order_id TEXT,
-    status TEXT NOT NULL,
-    raw_response TEXT,
-    created_at INTEGER NOT NULL
 );
 
 -- Jedna vrijednost po danu (ne OHLC) - za FRED makro serije, DeFiLlama TVL, CoinGecko ponudu
