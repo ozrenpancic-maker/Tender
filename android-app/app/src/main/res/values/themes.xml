@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.KriptoMVP" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#2F5FDB</item>
+        <item name="colorPrimaryDark">#1D3C8F</item>
+        <item name="colorAccent">#2F5FDB</item>
+        <item name="android:statusBarColor">#1D3C8F</item>
+        <item name="android:windowBackground">#F8FAFC</item>
+    </style>
+</resources>

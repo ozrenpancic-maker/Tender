@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Dopušta obični HTTP (cleartext) promet jer backend radi preko lokalne mreže bez HTTPS-a (vidi
+crypto-trading/README.md - "Android (instalacija na telefon preko lokalne mreže)").
+
+Ovo je namjerno globalno dopušteno (base-config), ne ograničeno na jednu IP adresu, jer se IP
+adresa računala mijenja (DHCP) - app bi inače trebalo prekompajlirati svaki put kad se IP promijeni.
+Prihvatljivo je ovdje jer ova app ne učitava proizvoljan internetski sadržaj, samo tvoj dashboard
+čiju adresu sam upisuješ u Postavkama. Ako želiš strože ograničenje, zamijeni base-config
+domain-config blokom koji navodi točnu IP adresu tvog računala, npr.:
+  <domain-config cleartextTrafficPermitted="true">
+    <domain includeSubdomains="false">192.168.1.50</domain>
+  </domain-config>
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KriptoMVP</string>
+    <string name="menu_settings">Postavke</string>
+    <string name="menu_refresh">Osvježi</string>
+    <string name="settings_title">Adresa servera</string>
+    <string name="settings_hint">npr. 192.168.1.50:8010</string>
+    <string name="settings_save">Spremi</string>
+    <string name="settings_cancel">Odustani</string>
+    <string name="not_configured">Unesi adresu računala na kojem radi aplikacija (Postavke → adresa servera, npr. 192.168.1.50:8010).</string>
+    <string name="load_error">Ne mogu se spojiti na server. Provjeri je li pokrenut (uvicorn --host 0.0.0.0) i jeste li na istoj WiFi mreži.</string>
+</resources>
