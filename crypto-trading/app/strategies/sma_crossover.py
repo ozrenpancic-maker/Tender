@@ -1,5 +1,9 @@
 """Kupi kad brzi SMA presječe spori SMA prema gore, prodaj kad presječe prema dolje.
-Parametri: fast (dana), slow (dana)."""
+Parametri: fast (dana), slow (dana).
+
+Default fast=10/slow=40 je odabran nakon pretrage po više parova (BTC/EUR, BTC/USDT, ETH/USDT,
+SOL/USDT) i razdoblja (2022-2026, uključujući medvjeđe tržište 2022.) kao najdosljedniji - vidi
+README za detalje i, važnije, za ograničenja tog nalaza (nije dokaz buduće dobiti)."""
 from app.strategies.base import Decision, StrategyContext
 
 
@@ -11,7 +15,7 @@ def _sma(values: list[float], period: int) -> float | None:
 
 def decide(ctx: StrategyContext) -> Decision:
     fast_n = int(ctx.params.get("fast", 10))
-    slow_n = int(ctx.params.get("slow", 30))
+    slow_n = int(ctx.params.get("slow", 40))
     closes = [c.close for c in ctx.candles[: ctx.index + 1]]
 
     if len(closes) < slow_n + 1:
@@ -33,4 +37,4 @@ def decide(ctx: StrategyContext) -> Decision:
 
 
 LABEL = "SMA presjek (brzi/spori prosjek)"
-DEFAULT_PARAMS = {"fast": 10, "slow": 30}
+DEFAULT_PARAMS = {"fast": 10, "slow": 40}

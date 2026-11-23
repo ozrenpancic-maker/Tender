@@ -42,6 +42,45 @@ ovom paru/razdoblju nisu pokazale pouzdanu prednost koja preživljava izvan uzor
 pronađena.** Prije nego se bilo čemu ovdje vjeruje s pravim novcem, treba naći kombinaciju koja
 radi dobro na OBA razdoblja (dashboard to jasno označava), i dalje uz svijest da ni to nije jamstvo.
 
+### Pretraga po više parova i razdoblja — najjači dosadašnji nalaz
+
+Pretraga je proširena na sva 4 dostupna para (BTC/EUR, BTC/USDT, ETH/USDT, SOL/USDT) i više
+razdoblja (2022–2026, po godinama, uključujući medvjeđe tržište 2022.). Nalazi:
+
+- `dip_buy_volume` nije bio profitabilan izvan uzorka ni u jednom od 8 testiranih kombinacija
+  para/razdoblja. `rsi_meanrev` samo u 1 od 8. `sma_crossover` je jedina strategija koja je dosljedno
+  prolazila oba testa na više parova.
+- Svaka testirana kombinacija parametara gubi novac u 2022. na svim parovima - očekivano za
+  strategiju koja prati trend, jer je 2022. bila produženo medvjeđe tržište (Terra/Luna, FTX).
+  Ovo nije slučajnost specifična za jedan par, nego dosljedan obrazac.
+- Fiksna kombinacija **fast=10/slow=40** (sad je to default za `sma_crossover`) testirana je kao
+  JEDAN neprekinuti backtest 2022-01-01 do 2026-11-21 (puni ciklus pad-oporavak-rast) na sva 4 para,
+  bez ponovnog optimiziranja parametara za svaki par:
+
+  | Par | SMA(10/40) | Buy & Hold | Max pad (strategija / hold) |
+  |---|---|---|---|
+  | BTC/EUR | 709 € | 672 € | 48% / 64% |
+  | BTC/USDT | 729 € | 648 € | 50% / 67% |
+  | ETH/USDT | 1.208 € | 228 € | 44% / 74% |
+  | SOL/USDT | 2.075 € | 206 € | 67% / 95% |
+
+  (Svi rezultati od 500 € početnog ulaganja, uključujući naknade/slippage.) Strategija nadmašuje
+  buy&hold na sva 4 para, uvijek uz manji maksimalni pad - mehanizam je da filter trenda izbacuje iz
+  pozicije tijekom produženih padova, pa izbjegne dio štete od sloma 2022. (ETH/SOL buy&hold izgubio
+  je tad >50% vrijednosti).
+
+  **Ograničenja ovog nalaza, ne uljepšana verzija:**
+  - Prednost na BTC parovima je skromna (709 vs 672 €, 729 vs 648 €) - veći dio "pobjede" dolazi od
+    ETH-a i SOL-a, koji su 2022. pali posebno teško. Sljedeći medvjeđi ciklus ne mora pogoditi iste
+    parove jednako teško.
+  - `fast=10/slow=40` nije izabran iz potpuno "slijepog" testa - odabran je jer se pokazao
+    najdosljedniji u ranijoj godišnjoj/in-sample-out-of-sample pretrazi, pa je ovaj test potvrda tog
+    nalaza na punom razdoblju, ne nova, potpuno neviđena provjera.
+  - 2022-2026 je jedan uzorak tržišne povijesti (jedan ciklus). Max pad je i dalje 44-67% - ovo je
+    "manje loše od kupi-i-drži", ne "bez rizika".
+  - Backtest i dalje nije isto što i live trgovanje (vidi odjeljke "Kako je provjereno" i
+    "Sigurnosni mehanizmi" ispod).
+
 ## Arhitektura
 
 - **`data/kripto.sqlite`** — povijesne dnevne/5-min svijeće (Binance, Coin Metrics, uzorci
