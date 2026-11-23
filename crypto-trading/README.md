@@ -16,8 +16,10 @@ sada - samo analiza/backtest.
 od portfelja koji je ovoliko u minusu - to bi bilo prazno obećanje. `app/binance_history_client.py`
 dodaje mogućnost dohvaćanja povijesti za BAŠ te coinove (izvorna baza je imala samo BTC/ETH/SOL),
 da bi se strategije mogle pošteno testirati na njima umjesto nagađanja. Čim se sinkroniziraju
-(dashboard, odjeljak 1), odmah su dostupni u backtestu/optimizatoru (odjeljci 2 i 5) jer koriste
-isti `candle` format - ništa se drugo ne mijenja u kodu.
+(dashboard, odjeljak 2), odmah su dostupni u backtestu/optimizatoru (odjeljci 3 i 6) jer koriste
+isti `candle` format - ništa se drugo ne mijenja u kodu. Dodan je i **odjeljak 1 "Signali
+kupi/prodaj"** koji direktno odgovara na pitanje "kad kupiti/prodati koji coin" - vidi novu sekciju
+ispod.
 
 Napomene specifične za ove coinove:
 - PEPE i SUI su mladi (2023.) - mnogo kraća povijest za testiranje znači manje statističke snage;
@@ -28,6 +30,50 @@ Napomene specifične za ove coinove:
 - POL je Binance simbol nakon Polygon rebranda (bivši MATIC) - ako "Testiraj vezu" javi grešku za
   njega, Binance možda još uvijek koristi stari simbol za taj par, provjeri i ispravi u
   `PORTFOLIO_PAIRS`.
+
+## Signali kupi/prodaj (`app/signals.py`, dashboard odjeljak 1)
+
+Korisnik je tražio da aplikacija izravno kaže "kad kupiti koji kripto i kada prodati", u dva
+horizonta: kratkoročno (2h do par dana) i dugoročno (3+ mjeseca). Prije gradnje, kratkoročni dio je
+STVARNO testiran (ne pretpostavljen) na jedinom pravom skupu podataka koji za to imamo: priloženi
+paket sadrži prave 5-minutne svijeće za BTC/ETH/SOL od 2026-08-01 do 2026-11-21 (113 dana), koje su
+agregirane u 4h svijeće (`interval_min=240` u `candle` tablici, iste pravo-povijesne, ne izmišljene).
+
+**Nalaz**: prave kratkoročne (satne/par-dnevne) mehaničke konfiguracije - RSI mean-reversion, brzi
+SMA presjek (12h/36h) - dosljedno su GUBILE novac na sva 4 para, uglavnom zbog naknada (0,4% +
+0,1% slippage po strani) pri prečestom trgovanju (briza varijanta: 48 trgovina u 113 dana, pad do
+52%). Sporiji `sma_crossover` (fast=12/slow=48, u satima ~2 dana/8 dana) pobjeđivao je "kupi i drži"
+na sva 4 para, ali s nijansiranim obrascem potvrđenim i u in-sample (kolovoz-sredina listopada,
+snažan uspon) i out-of-sample (sredina listopada-studeni, pad) dijelu: GUBIO je dio dobiti tijekom
+uspona, ali DRAMATIČNO ograničio gubitak tijekom pada (pad portfelja od svega 0-12% umjesto 30-38%
+za buy&hold). To je svjestan, objašnjiv kompromis (manja gornja granica dobiti za puno manji rizik
+pada), ne "pobjeđuje uvijek" - i stvarna učestalost trgovanja bila je otprilike jednom svakih 1-2
+tjedna po paru, ne doslovno svaka 2 sata.
+
+**Zašto `dip_buy_volume` NIJE korišten unatoč dobrom rezultatu u prvom testu**: ta strategija pamti
+kada je "ušla u poziciju" kroz uzastopne pozive unutar backtest petlje (`ctx.params["_entry_index"]`)
+da zna kad je prošao `hold_days`. Za ŽIVI signal ne postoji ta povijest poziva - ne znamo kad si ti
+stvarno kupio pojedini coin - pa bi uvjet izlaska bio neupotrebljiv/pogrešan izvan backtesta. Zato
+`app/signals.py` namjerno koristi samo STATELESS strategije (presjek dviju pokretnih prosjeka,
+izračunljiv iz same trenutne i prethodne svijeće, bez potrebe za pamćenjem povijesti poziva).
+
+**Kako radi**: `compute_signal(pair, horizon)` dohvaća najnovije svijeće uživo (Binance, bez ključa)
+i pokreće `decide()` ISTE funkcije koja se koristi u backtestu, dva puta - jednom s
+`in_position=True` (tvoja stvarna situacija za sve coinove iz portfelja - daje DRŽI/PRODAJ) i jednom
+s `in_position=False` (da dokupljuješ/ponovno ulaziš - daje ČEKAJ/KUPI). Nema posebne logike za
+"live" - identičan kod kao backtest, samo pozvan jednom na zadnju svijeću umjesto u petlji.
+
+**Presets**:
+- Kratkoročno: `sma_crossover` fast=12/slow=48 na 4h svijećama, testiran kako je opisano gore.
+- Dugoročno: `sma_crossover` fast=10/slow=40 na dnevnim svijećama - isti default kao ostatak
+  aplikacije (vidi "Pretraga po više parova" ispod), testiran na BTC/ETH/SOL kroz puni ciklus
+  2022-2026, NIJE testiran specifično na XRP/SUI/PEPE/DOGE/POL/NEAR/ALGO.
+
+**I dalje vrijedi**: ovo su mehanički signali iz koda koji može biti u krivu, ne preporuke
+financijskog savjetnika. Kratkoročni preset nije testiran na konkretnim coinovima iz portfelja -
+samo na BTC/ETH/SOL. Ako "Osvježi signale" javi grešku, isti je razlog kao svugdje u ovom README-u
+- ovo razvojno okruženje nema izlazni pristup internetu da bi se Binance pozivi mogli uživo
+testirati; logika je potvrđena korištenjem stvarnih (ne izmišljenih) 4h BTC podataka već u bazi.
 
 ## Ključni nalaz od kojeg se kreće
 
@@ -42,14 +88,14 @@ Tri nove strategije su dodane da bi se moglo tražiti nešto bolje: `sma_crossov
 fast=5/slow=20 je u ovom jednom testu nadmašio i baseline i "buy & hold" (908 € nasuprot 710 € za
 buy&hold i 108 € za baseline). **Ovo NIJE dokaz trajne prednosti** — uzorak ima svega ~26 trgovina
 na jednom paru u jednom (uglavnom rastućem) tržišnom razdoblju, što je premalo da se isključi
-slučajnost ili da se zaključi da će raditi i ubuduće. Koristi dashboard (odjeljak 1) da testiraš
+slučajnost ili da se zaključi da će raditi i ubuduće. Koristi dashboard (odjeljak 3) da testiraš
 više parova, razdoblja i parametara prije nego ičemu vjeruješ.
 
 Dodane su i dvije strategije s makro kontekstom: `equity_filtered` (isti SMA presjek, ali 'buy' je
 dopušten samo kad je S&P 500 iznad svog 50-dnevnog prosjeka) i `multi_macro_filter` (isto, plus
 zahtijeva da zlato NIJE u naglom skoku - tipičan znak "bijega u sigurnost"/risk-off raspoloženja).
 Obje testiraju ideju da kripto cijene dobrim dijelom prate opće tržišno raspoloženje. Trebaju
-sinkronizirane S&P 500 / zlato podatke (dashboard, odjeljak 2) prije pokretanja backtesta; bez toga
+sinkronizirane S&P 500 / zlato podatke (dashboard, odjeljak 4) prije pokretanja backtesta; bez toga
 bacaju jasnu grešku umjesto da tiho zanemare filter.
 
 ### Širi popis čimbenika (tehnička analiza, makro, sentiment, regulativa, fundamentalno)
@@ -72,9 +118,9 @@ RSI, ROC, OBV, ATR, Bollinger Bands).
 **`macro_signal_composite`** - obavezan EMA200 trend gate plus glasovanje 4 neovisna signala (Fed
 stopa ne raste, Reddit sentiment, regulatorni skor, ETF tokovi) - kupnja samo ako dovoljno glasova
 kaže "risk-on". Nedostajući podatak se ne broji ni za ni protiv (ne nagađa se). Treba sve 4 serije
-sinkronizirane (dashboard, odjeljak 3) prije backtesta.
+sinkronizirane (dashboard, odjeljak 5) prije backtesta.
 
-Novi besplatni/sivo-područje izvori (dashboard, odjeljak 3; detalji i env varijable u "Pokretanje"):
+Novi besplatni/sivo-područje izvori (dashboard, odjeljak 5; detalji i env varijable u "Pokretanje"):
 
 | Izvor | Što daje | Cijena | Pouzdanost |
 |---|---|---|---|
@@ -109,7 +155,7 @@ nešto od ovoga, javi koji servis planiraš platiti pa se dogradi integracija s 
 
 ### Zašto "pronađi profitabilnu strategiju" nije tako jednostavno kako zvuči
 
-Dodan je **optimizator s in-sample/out-of-sample provjerom** (dashboard, odjeljak 3; `app/optimizer.py`)
+Dodan je **optimizator s in-sample/out-of-sample provjerom** (dashboard, odjeljak 6; `app/optimizer.py`)
 jer je ručno biranje parametara dok rezultat na JEDNOM razdoblju ne izgleda dobro klasičan "curve
 fitting" - gotovo uvijek postoji neka kombinacija koja na papiru izgleda sjajno čistom slučajnošću.
 Konkretan primjer iz ovog projekta: `sma_crossover` optimiziran na 2024–2025 (in-sample) daje
@@ -174,9 +220,12 @@ razdoblja (2022–2026, po godinama, uključujući medvjeđe tržište 2022.). N
 - **`app/equity_client.py`** — dnevni podaci za S&P 500 / Dow / Nasdaq / zlato sa Stooq-a (javno,
   bez ključa), za makro-filter strategije. `app/aux.py` poravnava kripto (trguje se 7 dana u tjednu)
   i equity/zlato (zatvoreno vikendom) kalendare uzimanjem zadnje poznate cijene na/prije danog dana.
-- **`app/binance_history_client.py`** — dnevna povijest cijena za proizvoljan Binance par (npr. iz
-  tvog portfelja), izravno u `candle` tablicu (source_id='binance') - isti oblik kao izvorni
-  podaci, pa odmah radi sa svim postojećim strategijama/backtestom/optimizatorom.
+- **`app/binance_history_client.py`** — povijest cijena za proizvoljan Binance par i interval
+  (1d/4h/1h), izravno u `candle` tablicu (source_id='binance') - isti oblik kao izvorni podaci, pa
+  odmah radi sa svim postojećim strategijama/backtestom/optimizatorom.
+- **`app/signals.py`** — trenutni (uživo) signal kupi/prodaj po dva horizonta, koristi iste
+  `decide()` funkcije kao backtest, pozvane jednom na zadnju svijeću umjesto u petlji. Vidi
+  "Signali kupi/prodaj" iznad.
 - **`app/indicators.py`** — čiste funkcije za EMA, MACD, Stochastic RSI, ROC, OBV, ATR, Bollinger
   Bands - bez vanjskih poziva, koriste ih `technical_composite` i `macro_signal_composite`.
 - **`app/macro_store.py`** + `macro_series` tablica — generička pohrana ne-OHLC serija (jedna
@@ -323,7 +372,7 @@ potpunog gubitka uloženih sredstava.
   razliku od trend-prateećih strategija u ovom projektu - testira drukčiju tezu, nije "poboljšana
   verzija" nečeg postojećeg. Pragovi ekstrema (`extreme_negative`/`extreme_positive`) su proizvoljno
   postavljeni početni pokušaji, ne kalibrirani na povijesnu distribuciju funding ratea - koristi
-  optimizator (odjeljak 4) prije vjerovanja bilo kojoj konkretnoj vrijednosti.
+  optimizator (odjeljak 6) prije vjerovanja bilo kojoj konkretnoj vrijednosti.
 - `github_client.py` prati samo broj commitova, ne i njihovu kvalitetu/veličinu - jedan commit koji
   mijenja jedan redak broji se jednako kao veliki refactor. Grub proxy za aktivnost, ne za kvalitetu
   razvoja.
@@ -333,7 +382,15 @@ potpunog gubitka uloženih sredstava.
 - `binance_history_client.py` sinkronizira cijelu dostupnu povijest pri svakom pozivu (nema
   inkrementalnog "samo nove podatke" moda) - za coinove s dugom poviješću (DOGE postoji od 2019.)
   prvi sync može potrajati zbog straniciranja Binance API-ja (max 1000 svijeća po pozivu).
-- Rezultat backtesta/optimizatora na tvojim konkretnim coinovima (odjeljak 1) NIJE unaprijed
+- Rezultat backtesta/optimizatora na tvojim konkretnim coinovima (odjeljci 3 i 6) NIJE unaprijed
   poznat - možda će neka strategija pokazati prednost, možda neće nijedna, kao što se dogodilo s
   BTC/ETH/SOL (vidi "Ključni nalaz" i "Pretraga po više parova" gore). Pokreni ga i pogledaj
   rezultat pošteno, ne traži potvrdu onoga što bi želio čuti.
+- "Signali kupi/prodaj" (odjeljak 1) rade uvijek na NAJNOVIJOJ dostupnoj svijeći, koja kod 4h
+  intervala može biti još "u tijeku" (nedovršena) - Binance klines endpoint je ne isključuje
+  automatski. Za živi signal to je razumno (želiš najsvježiju cijenu), ali znači da se vrijednost
+  može malo promijeniti do kraja te 4h svijeće - nije isto kao strogo zatvorena povijesna svijeća
+  korištena u backtestu.
+- Kratkoročni preset u "Signali kupi/prodaj" treba sinkronizirane 4h podatke da bi ga mogao i
+  backtestirati (ne samo gledati živi signal) - koristi `interval: "4h"` pri sync pozivu
+  (`/api/binance-history/sync`) ili dashboard sekciju 2 s odgovarajućim odabirom intervala.

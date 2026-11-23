@@ -26,7 +26,32 @@
   </section>
 
   <section>
-    <h2>1. Tvoj portfolio — sinkroniziraj povijest</h2>
+    <h2>1. Signali kupi/prodaj</h2>
+    <p class="muted">
+      Trenutna (uživo) odluka mehaničke strategije za svaki coin iz portfelja, u dva horizonta.
+      <strong>Ovo nisu preporuke financijskog savjetnika i mogu biti u krivu.</strong> Kratkoročni
+      preset na jedinom stvarnom testu koji imamo (BTC/ETH/SOL, 3,5 mjeseca) gubio je dio dobiti u
+      jakom usponu, ali je dramatično ograničio gubitak u padu — svjestan kompromis, ne zajamčena
+      prednost, i nije testiran na ovim konkretnim coinovima. "Drži/Prodaj" stupac pretpostavlja da
+      coin već imaš (točno za tvoj portfolio); "Kupi/Čekaj" stupac pokazuje što bi signal rekao da
+      ga nemaš (npr. za dokup).
+    </p>
+    <button id="sigRefresh">Osvježi signale</button>
+    <div id="sigStatus" class="muted" style="margin-top:8px"></div>
+    <table id="sigTable" style="display:none">
+      <thead>
+        <tr>
+          <th>Coin</th><th>Cijena</th>
+          <th>Kratkoročno — drži/prodaj</th><th>Kratkoročno — kupi/čekaj</th>
+          <th>Dugoročno — drži/prodaj</th><th>Dugoročno — kupi/čekaj</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>2. Tvoj portfolio — sinkroniziraj povijest</h2>
     <p class="muted">
       Backtest i optimizator rade samo nad parovima koji su već sinkronizirani u bazu. Izvorna baza
       pokriva BTC/ETH/SOL - za ostale coinove (npr. iz tvog stvarnog portfelja) prvo ih sinkroniziraj
@@ -35,6 +60,13 @@
       dolje ako svejedno želiš, upisujući par kao "SYMBOL/USDT".
     </p>
     <div class="row">
+      <div class="field">
+        <label>Interval svijeća</label>
+        <select id="bhInterval">
+          <option value="1d">1 dan (za dugoročni signal)</option>
+          <option value="4h">4 sata (za kratkoročni signal)</option>
+        </select>
+      </div>
       <button class="secondary" id="bhTest">Testiraj vezu</button>
       <button id="bhSyncAll">Sinkroniziraj sve iz portfelja</button>
     </div>
@@ -49,7 +81,7 @@
   </section>
 
   <section>
-    <h2>2. Usporedba strategija (backtest na povijesnim podacima)</h2>
+    <h2>3. Usporedba strategija (backtest na povijesnim podacima)</h2>
     <p class="muted">
       Bazno pravilo iz priloženog izvještaja (kupi na +2% dnevni signal) u testiranom razdoblju <strong>gubi novac</strong>
       (500&nbsp;€ → 108,41&nbsp;€, pad 79,11%). Ovdje možeš testirati druge strategije i uvijek ih usporediti s
@@ -101,9 +133,9 @@
   </section>
 
   <section>
-    <h2>3. Wall Street i zlato (S&amp;P 500, Dow, Nasdaq, zlato)</h2>
+    <h2>4. Wall Street i zlato (S&amp;P 500, Dow, Nasdaq, zlato)</h2>
     <p class="muted">
-      Dnevni podaci s javnog Stooq izvora, bez ključa. Strategije s makro filterom (odjeljak 2) koriste ovo da
+      Dnevni podaci s javnog Stooq izvora, bez ključa. Strategije s makro filterom (odjeljak 3) koriste ovo da
       kripto signal propuste samo kad je makro okruženje "risk-on". Korelacija kripta s dioničkim tržištem/zlatom
       nije zajamčena da će se nastaviti — ovo je alat za testiranje te ideje, ne potvrđena strategija.
     </p>
@@ -115,7 +147,7 @@
   </section>
 
   <section>
-    <h2>4. Makro, sentiment i regulativa</h2>
+    <h2>5. Makro, sentiment i regulativa</h2>
     <p class="muted">
       Besplatni izvori: <strong>FRED</strong> (Fed stopa/CPI/nezaposlenost/M2/prinosi na obveznice — treba
       besplatan FRED_API_KEY), <strong>DeFiLlama</strong> (TVL, bez ključa), <strong>CoinGecko</strong>
@@ -126,7 +158,7 @@
       <strong>regulativa</strong> (grubo brojanje riječi), <strong>CryptoPanic</strong> (stvarni glasovi
       zajednice, treba besplatnu registraciju) i <strong>ETF tokovi</strong> (scraping farside.co.uk).
       Leksikonski dijelovi nisu pravna ni NLP analiza — tretiraj kao grub signal, ne zaključak.
-      Koriste ih strategije "Makro glasovanje" i "Derivati - funding rate ekstremi" (odjeljak 2).
+      Koriste ih strategije "Makro glasovanje" i "Derivati - funding rate ekstremi" (odjeljak 3).
     </p>
     <div class="row">
       <button class="secondary" id="macroTest">Testiraj sve veze</button>
@@ -136,7 +168,7 @@
   </section>
 
   <section>
-    <h2>5. Optimizacija parametara (in-sample / out-of-sample)</h2>
+    <h2>6. Optimizacija parametara (in-sample / out-of-sample)</h2>
     <p class="muted">
       Pretražuje kombinacije parametara na "in-sample" razdoblju i rangira ih po rezultatu, zatim
       par najboljih provjerava na "out-of-sample" razdoblju koje optimizacija nije vidjela.
@@ -190,14 +222,14 @@
   </section>
 
   <section>
-    <h2>6. Coinbase veza</h2>
+    <h2>7. Coinbase veza</h2>
     <p class="muted">Javni cjenovni feed ne treba ključ. Autenticirani dio (stanje računa, slanje naloga) treba API ključ u .env — vidi README.</p>
     <button id="cbTest">Testiraj vezu</button>
     <div id="cbResult" style="margin-top:12px"></div>
   </section>
 
   <section>
-    <h2>7. Paper trading (simulacija na živim cijenama, bez pravog novca)</h2>
+    <h2>8. Paper trading (simulacija na živim cijenama, bez pravog novca)</h2>
     <div class="row">
       <div class="field">
         <label>Strategija</label>
@@ -223,7 +255,7 @@
   </section>
 
   <section>
-    <h2>8. Live trgovanje (pravi novac)</h2>
+    <h2>9. Live trgovanje (pravi novac)</h2>
     <div id="liveDetailBanner"></div>
     <div class="row" id="liveStartForm" style="display:none">
       <div class="field">

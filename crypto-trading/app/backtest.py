@@ -93,11 +93,20 @@ def run_buy_hold(candles: list[Candle], starting_balance: float) -> dict:
     }
 
 
-def run_backtest(conn, strategy_key: str, pair: str, start_ts: int, end_ts: int, params: dict, starting_balance: float) -> dict:
+def run_backtest(
+    conn,
+    strategy_key: str,
+    pair: str,
+    start_ts: int,
+    end_ts: int,
+    params: dict,
+    starting_balance: float,
+    interval_min: int = 1440,
+) -> dict:
     if strategy_key == "buy_hold":
-        candles = load_candles(conn, "binance", pair, 1440, start_ts, end_ts)
+        candles = load_candles(conn, "binance", pair, interval_min, start_ts, end_ts)
         if len(candles) < 2:
-            raise ValueError(f"Nema dovoljno dnevnih svijeća za {pair} u traženom razdoblju.")
+            raise ValueError(f"Nema dovoljno svijeća za {pair} u traženom razdoblju.")
         return run_buy_hold(candles, starting_balance)
 
     if strategy_key == "baseline_2pct":
@@ -109,9 +118,9 @@ def run_backtest(conn, strategy_key: str, pair: str, start_ts: int, end_ts: int,
             raise ValueError(f"Nema dovoljno dnevnih svijeća za {pair} u traženom razdoblju.")
         return run_baseline(candles, starting_balance, start_ts, end_ts)
 
-    candles = load_candles(conn, "binance", pair, 1440, start_ts, end_ts)
+    candles = load_candles(conn, "binance", pair, interval_min, start_ts, end_ts)
     if len(candles) < 5:
-        raise ValueError(f"Nema dovoljno dnevnih svijeća za {pair} u traženom razdoblju.")
+        raise ValueError(f"Nema dovoljno svijeća za {pair} u traženom razdoblju (interval {interval_min} min).")
 
     if strategy_key not in GENERIC_STRATEGIES:
         raise ValueError(f"Nepoznata strategija: {strategy_key}")

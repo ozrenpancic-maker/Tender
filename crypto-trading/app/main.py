@@ -11,6 +11,7 @@ from app.backtest import run_backtest
 from app.candles import available_pairs
 from app.macro_clients import MACRO_CLIENTS, all_labels, test_all_connections
 from app.optimizer import DEFAULT_GRIDS, optimize
+from app.signals import PRESETS as SIGNAL_PRESETS, compute_all as compute_all_signals
 from app.strategies import GENERIC_STRATEGIES
 
 app = FastAPI(title="Kripto trgovanje - istraživački MVP")
@@ -68,6 +69,7 @@ class BacktestRequest(BaseModel):
     end_date: str
     params: dict = {}
     starting_balance: float = 500.0
+    interval_min: int = 1440
 
 
 @app.post("/api/backtest")
@@ -80,7 +82,9 @@ def backtest(req: BacktestRequest):
 
     conn = db.get_connection()
     try:
-        result = run_backtest(conn, req.strategy, req.pair, start_ts, end_ts, req.params, req.starting_balance)
+        result = run_backtest(
+            conn, req.strategy, req.pair, start_ts, end_ts, req.params, req.starting_balance, req.interval_min
+        )
         conn.execute(
             "INSERT INTO backtest_run (strategy, params_json, pair, start_date, end_date, result_json, created_at)"
             " VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -185,18 +189,32 @@ def binance_history_test_connection():
 class BinanceSyncRequest(BaseModel):
     pair: str
     since: str = "2017-01-01"
+    interval: str = "1d"
 
 
 @app.post("/api/binance-history/sync")
 def binance_history_sync(req: BinanceSyncRequest):
     conn = db.get_connection()
     try:
-        count = binance_history_client.sync_to_db(conn, req.pair, req.since)
+        count = binance_history_client.sync_to_db(conn, req.pair, req.since, req.interval)
         return {"pair": req.pair, "rows": count}
     except Exception as err:
         raise HTTPException(502, str(err))
     finally:
         conn.close()
+
+
+# ---------- Signali kupi/prodaj (uživo, kratkoročno + dugoročno) ----------
+
+@app.get("/api/signals/presets")
+def signals_presets():
+    return {h: {"label": p["label"], "strategy": p["strategy"], "params": p["params"]} for h, p in SIGNAL_PRESETS.items()}
+
+
+@app.get("/api/signals")
+def signals(pairs: str = ""):
+    pair_list = [p.strip() for p in pairs.split(",") if p.strip()] or list(binance_history_client.PORTFOLIO_PAIRS)
+    return {"signals": compute_all_signals(pair_list)}
 
 
 # ---------- Wall Street / equity indeksi ----------

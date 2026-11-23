@@ -519,23 +519,24 @@ document.getElementById("bhTest").addEventListener("click", async () => {
   }
 });
 
-async function syncBinancePair(pair) {
+async function syncBinancePair(pair, interval) {
   return api("/api/binance-history/sync", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pair }),
+    body: JSON.stringify({ pair, interval }),
   });
 }
 
 document.getElementById("bhSyncAll").addEventListener("click", async () => {
   const el = document.getElementById("bhResult");
+  const interval = document.getElementById("bhInterval").value;
   el.textContent = "Sinkroniziram…";
   const { pairs } = await api("/api/binance-history/pairs");
   const lines = [];
   for (const pair of pairs) {
     try {
-      const r = await syncBinancePair(pair);
-      lines.push(`<p><span class="pill ok">${pair}</span> ${r.rows} dnevnih svijeća sinkronizirano.</p>`);
+      const r = await syncBinancePair(pair, interval);
+      lines.push(`<p><span class="pill ok">${pair}</span> ${r.rows} svijeća (${interval}) sinkronizirano.</p>`);
     } catch (err) {
       lines.push(`<p><span class="pill fail">${pair}</span> ${err.message}</p>`);
     }
@@ -547,11 +548,12 @@ document.getElementById("bhSyncAll").addEventListener("click", async () => {
 document.getElementById("bhSyncManual").addEventListener("click", async () => {
   const pair = document.getElementById("bhManualPair").value.trim();
   if (!pair) return;
+  const interval = document.getElementById("bhInterval").value;
   const el = document.getElementById("bhResult");
   el.textContent = `Sinkroniziram ${pair}…`;
   try {
-    const r = await syncBinancePair(pair);
-    el.innerHTML = `<p><span class="pill ok">${pair}</span> ${r.rows} dnevnih svijeća sinkronizirano.</p>`;
+    const r = await syncBinancePair(pair, interval);
+    el.innerHTML = `<p><span class="pill ok">${pair}</span> ${r.rows} svijeća (${interval}) sinkronizirano.</p>`;
     await refreshPairSelectors();
   } catch (err) {
     el.innerHTML = `<p><span class="pill fail">${pair}</span> ${err.message}</p>`;
@@ -567,8 +569,58 @@ async function refreshPairSelectors() {
   fillSelect("optPair", pairs);
 }
 
+// ---------- Signali kupi/prodaj ----------
+
+const ACTION_CLASS = {
+  PRODAJ: "fail",
+  KUPI: "ok",
+  DRŽI: "",
+  ČEKAJ: "",
+};
+
+function actionBadge(action) {
+  const cls = ACTION_CLASS[action];
+  return cls ? `<span class="pill ${cls}">${action}</span>` : action;
+}
+
+async function refreshSignals() {
+  const statusEl = document.getElementById("sigStatus");
+  const table = document.getElementById("sigTable");
+  statusEl.textContent = "Dohvaćam signale uživo…";
+
+  try {
+    const { signals } = await api("/api/signals");
+    const tbody = table.querySelector("tbody");
+    tbody.innerHTML = "";
+
+    for (const [pair, byHorizon] of Object.entries(signals)) {
+      const short = byHorizon.short;
+      const long = byHorizon.long;
+      const price = (short && short.price) || (long && long.price);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><strong>${pair}</strong></td>
+        <td>${price != null ? price.toLocaleString("hr-HR", { maximumFractionDigits: 6 }) : "—"}</td>
+        <td>${short && !short.error ? actionBadge(short.holding_action) : `<span class="muted">${short?.error || "nema podataka"}</span>`}</td>
+        <td>${short && !short.error ? actionBadge(short.entry_action) : "—"}</td>
+        <td>${long && !long.error ? actionBadge(long.holding_action) : `<span class="muted">${long?.error || "nema podataka"}</span>`}</td>
+        <td>${long && !long.error ? actionBadge(long.entry_action) : "—"}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    table.style.display = "table";
+    statusEl.textContent = `Ažurirano ${new Date().toLocaleTimeString("hr-HR")}. Prije prvog pokretanja sinkroniziraj povijest (odjeljak 2) za coinove koje želiš vidjeti ovdje.`;
+  } catch (err) {
+    statusEl.textContent = "Greška: " + err.message;
+  }
+}
+
+document.getElementById("sigRefresh").addEventListener("click", refreshSignals);
+
 init();
 setInterval(refreshPaperRuns, 30000);
+refreshSignals();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
