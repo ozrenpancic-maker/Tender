@@ -2,8 +2,8 @@
   "1h": {
     "horizon": "1h",
     "horizon_label": "1 sat",
-    "n_examples": 7533,
-    "trained_at": 1795461159,
+    "n_examples": 106524,
+    "trained_at": 1795462297,
     "feature_names": [
       "rsi14",
       "stoch_rsi14",
@@ -32,401 +32,270 @@
       "sideways"
     ],
     "lightgbm_walk_forward": {
-      "n": 6027,
-      "brier_score": 0.11068,
-      "baseline_brier_score": 0.11116,
-      "log_loss": 0.41618,
-      "baseline_log_loss": 0.26253,
-      "accuracy": 0.9411,
-      "baseline_accuracy": 0.9419,
-      "reliability": [
-        {
-          "range": [
-            0.5,
-            0.6
-          ],
-          "n": 26,
-          "avg_confidence": 0.5668,
-          "empirical_accuracy": 0.5769
-        },
-        {
-          "range": [
-            0.6,
-            0.7
-          ],
-          "n": 51,
-          "avg_confidence": 0.6635,
-          "empirical_accuracy": 0.7255
-        },
-        {
-          "range": [
-            0.7,
-            0.8
-          ],
-          "n": 89,
-          "avg_confidence": 0.743,
-          "empirical_accuracy": 0.8202
-        },
-        {
-          "range": [
-            0.8,
-            0.9
-          ],
-          "n": 434,
-          "avg_confidence": 0.8711,
-          "empirical_accuracy": 0.871
-        },
-        {
-          "range": [
-            0.9,
-            1.0
-          ],
-          "n": 5427,
-          "avg_confidence": 0.9655,
-          "empirical_accuracy": 0.9525
-        }
-      ]
-    },
-    "logreg_walk_forward": {
-      "n": 6027,
-      "brier_score": 0.12376,
-      "baseline_brier_score": 0.11116,
-      "log_loss": 0.57281,
-      "baseline_log_loss": 0.26253,
-      "accuracy": 0.9306,
-      "baseline_accuracy": 0.9419,
-      "reliability": [
-        {
-          "range": [
-            0.4,
-            0.5
-          ],
-          "n": 1,
-          "avg_confidence": 0.4968,
-          "empirical_accuracy": 1.0
-        },
-        {
-          "range": [
-            0.5,
-            0.6
-          ],
-          "n": 60,
-          "avg_confidence": 0.5518,
-          "empirical_accuracy": 0.2833
-        },
-        {
-          "range": [
-            0.6,
-            0.7
-          ],
-          "n": 41,
-          "avg_confidence": 0.6715,
-          "empirical_accuracy": 0.6829
-        },
-        {
-          "range": [
-            0.7,
-            0.8
-          ],
-          "n": 31,
-          "avg_confidence": 0.7596,
-          "empirical_accuracy": 0.8387
-        },
-        {
-          "range": [
-            0.8,
-            0.9
-          ],
-          "n": 235,
-          "avg_confidence": 0.8692,
-          "empirical_accuracy": 0.8383
-        },
-        {
-          "range": [
-            0.9,
-            1.0
-          ],
-          "n": 5659,
-          "avg_confidence": 0.9605,
-          "empirical_accuracy": 0.9436
-        }
-      ]
-    },
-    "validated": false,
-    "reason": "LightGBM Brier score (0.11068) nije bolji od naivne bazne linije (0.11116) na walk-forward testu - model NE pokazuje stvarnu prednost na ovom horizontu s dostupnim podacima. Live signal za ovaj horizont vraća WAIT.",
-    "model_path": "1h_lgbm.joblib"
-  },
-  "4h": {
-    "horizon": "4h",
-    "horizon_label": "4 sata",
-    "n_examples": 1431,
-    "trained_at": 1795461160,
-    "feature_names": [
-      "rsi14",
-      "stoch_rsi14",
-      "macd_hist_norm",
-      "ema9_dist",
-      "ema21_dist",
-      "ema50_dist",
-      "ema200_dist",
-      "sma20_dist",
-      "sma50_dist",
-      "sma200_dist",
-      "atr14_norm",
-      "atr_percentile100",
-      "bb_pct_b",
-      "bb_bandwidth",
-      "roc5",
-      "roc10",
-      "roc20",
-      "volume_rel20",
-      "dist_from_high20",
-      "dist_from_low20"
-    ],
-    "classes": [
-      "up",
-      "down",
-      "sideways"
-    ],
-    "lightgbm_walk_forward": {
-      "n": 1074,
-      "brier_score": 0.40572,
-      "baseline_brier_score": 0.37838,
-      "log_loss": 1.55516,
-      "baseline_log_loss": 0.69427,
-      "accuracy": 0.7654,
-      "baseline_accuracy": 0.7728,
-      "reliability": [
-        {
-          "range": [
-            0.4,
-            0.5
-          ],
-          "n": 1,
-          "avg_confidence": 0.4954,
-          "empirical_accuracy": 1.0
-        },
-        {
-          "range": [
-            0.5,
-            0.6
-          ],
-          "n": 22,
-          "avg_confidence": 0.5507,
-          "empirical_accuracy": 0.6364
-        },
-        {
-          "range": [
-            0.6,
-            0.7
-          ],
-          "n": 192,
-          "avg_confidence": 0.6411,
-          "empirical_accuracy": 0.75
-        },
-        {
-          "range": [
-            0.7,
-            0.8
-          ],
-          "n": 238,
-          "avg_confidence": 0.739,
-          "empirical_accuracy": 0.7521
-        },
-        {
-          "range": [
-            0.8,
-            0.9
-          ],
-          "n": 421,
-          "avg_confidence": 0.8389,
-          "empirical_accuracy": 0.7482
-        },
-        {
-          "range": [
-            0.9,
-            1.0
-          ],
-          "n": 200,
-          "avg_confidence": 0.9377,
-          "empirical_accuracy": 0.845
-        }
-      ]
-    },
-    "logreg_walk_forward": {
-      "n": 1074,
-      "brier_score": 0.54195,
-      "baseline_brier_score": 0.37838,
-      "log_loss": 4.61826,
-      "baseline_log_loss": 0.69427,
-      "accuracy": 0.6667,
-      "baseline_accuracy": 0.7728,
-      "reliability": [
-        {
-          "range": [
-            0.4,
-            0.5
-          ],
-          "n": 12,
-          "avg_confidence": 0.4715,
-          "empirical_accuracy": 0.5833
-        },
-        {
-          "range": [
-            0.5,
-            0.6
-          ],
-          "n": 123,
-          "avg_confidence": 0.5632,
-          "empirical_accuracy": 0.3496
-        },
-        {
-          "range": [
-            0.6,
-            0.7
-          ],
-          "n": 100,
-          "avg_confidence": 0.6671,
-          "empirical_accuracy": 0.74
-        },
-        {
-          "range": [
-            0.7,
-            0.8
-          ],
-          "n": 358,
-          "avg_confidence": 0.7403,
-          "empirical_accuracy": 0.6508
-        },
-        {
-          "range": [
-            0.8,
-            0.9
-          ],
-          "n": 330,
-          "avg_confidence": 0.8528,
-          "empirical_accuracy": 0.7788
-        },
-        {
-          "range": [
-            0.9,
-            1.0
-          ],
-          "n": 151,
-          "avg_confidence": 0.9274,
-          "empirical_accuracy": 0.6755
-        }
-      ]
-    },
-    "validated": false,
-    "reason": "LightGBM Brier score (0.40572) nije bolji od naivne bazne linije (0.37838) na walk-forward testu - model NE pokazuje stvarnu prednost na ovom horizontu s dostupnim podacima. Live signal za ovaj horizont vraća WAIT.",
-    "model_path": "4h_lgbm.joblib"
-  },
-  "24h": {
-    "horizon": "24h",
-    "horizon_label": "24 sata",
-    "n_examples": 8459,
-    "trained_at": 1795461161,
-    "feature_names": [
-      "rsi14",
-      "stoch_rsi14",
-      "macd_hist_norm",
-      "ema9_dist",
-      "ema21_dist",
-      "ema50_dist",
-      "ema200_dist",
-      "sma20_dist",
-      "sma50_dist",
-      "sma200_dist",
-      "atr14_norm",
-      "atr_percentile100",
-      "bb_pct_b",
-      "bb_bandwidth",
-      "roc5",
-      "roc10",
-      "roc20",
-      "volume_rel20",
-      "dist_from_high20",
-      "dist_from_low20"
-    ],
-    "classes": [
-      "up",
-      "down",
-      "sideways"
-    ],
-    "lightgbm_walk_forward": {
-      "n": 6768,
-      "brier_score": 0.52605,
-      "baseline_brier_score": 0.52504,
-      "log_loss": 0.96225,
-      "baseline_log_loss": 0.90199,
-      "accuracy": 0.6396,
-      "baseline_accuracy": 0.6407,
-      "reliability": [
-        {
-          "range": [
-            0.4,
-            0.5
-          ],
-          "n": 58,
-          "avg_confidence": 0.4748,
-          "empirical_accuracy": 0.6034
-        },
-        {
-          "range": [
-            0.5,
-            0.6
-          ],
-          "n": 653,
-          "avg_confidence": 0.567,
-          "empirical_accuracy": 0.5727
-        },
-        {
-          "range": [
-            0.6,
-            0.7
-          ],
-          "n": 5110,
-          "avg_confidence": 0.6455,
-          "empirical_accuracy": 0.6403
-        },
-        {
-          "range": [
-            0.7,
-            0.8
-          ],
-          "n": 936,
-          "avg_confidence": 0.7204,
-          "empirical_accuracy": 0.6827
-        },
-        {
-          "range": [
-            0.8,
-            0.9
-          ],
-          "n": 11,
-          "avg_confidence": 0.8338,
-          "empirical_accuracy": 0.8182
-        }
-      ]
-    },
-    "logreg_walk_forward": {
-      "n": 6768,
-      "brier_score": 0.52927,
-      "baseline_brier_score": 0.52504,
-      "log_loss": 1.02581,
-      "baseline_log_loss": 0.90199,
-      "accuracy": 0.6349,
-      "baseline_accuracy": 0.6407,
+      "n": 85220,
+      "brier_score": 0.17983,
+      "baseline_brier_score": 0.19157,
+      "log_loss": 0.38149,
+      "baseline_log_loss": 0.40624,
+      "accuracy": 0.896,
+      "baseline_accuracy": 0.8964,
       "reliability": [
         {
           "range": [
             0.3,
             0.4
           ],
-          "n": 14,
-          "avg_confidence": 0.3896,
-          "empirical_accuracy": 0.4286
+          "n": 9,
+          "avg_confidence": 0.372,
+          "empirical_accuracy": 0.3333
+        },
+        {
+          "range": [
+            0.4,
+            0.5
+          ],
+          "n": 189,
+          "avg_confidence": 0.4489,
+          "empirical_accuracy": 0.5344
+        },
+        {
+          "range": [
+            0.5,
+            0.6
+          ],
+          "n": 459,
+          "avg_confidence": 0.5608,
+          "empirical_accuracy": 0.5033
+        },
+        {
+          "range": [
+            0.6,
+            0.7
+          ],
+          "n": 1621,
+          "avg_confidence": 0.6634,
+          "empirical_accuracy": 0.612
+        },
+        {
+          "range": [
+            0.7,
+            0.8
+          ],
+          "n": 7378,
+          "avg_confidence": 0.7631,
+          "empirical_accuracy": 0.7334
+        },
+        {
+          "range": [
+            0.8,
+            0.9
+          ],
+          "n": 26807,
+          "avg_confidence": 0.8595,
+          "empirical_accuracy": 0.8545
+        },
+        {
+          "range": [
+            0.9,
+            1.0
+          ],
+          "n": 48757,
+          "avg_confidence": 0.9492,
+          "empirical_accuracy": 0.958
+        }
+      ]
+    },
+    "logreg_walk_forward": {
+      "n": 85220,
+      "brier_score": 0.18247,
+      "baseline_brier_score": 0.19157,
+      "log_loss": 0.41524,
+      "baseline_log_loss": 0.40624,
+      "accuracy": 0.8949,
+      "baseline_accuracy": 0.8964,
+      "reliability": [
+        {
+          "range": [
+            0.4,
+            0.5
+          ],
+          "n": 19,
+          "avg_confidence": 0.4615,
+          "empirical_accuracy": 0.3158
+        },
+        {
+          "range": [
+            0.5,
+            0.6
+          ],
+          "n": 181,
+          "avg_confidence": 0.5187,
+          "empirical_accuracy": 0.2928
+        },
+        {
+          "range": [
+            0.6,
+            0.7
+          ],
+          "n": 2243,
+          "avg_confidence": 0.6536,
+          "empirical_accuracy": 0.654
+        },
+        {
+          "range": [
+            0.7,
+            0.8
+          ],
+          "n": 6230,
+          "avg_confidence": 0.7562,
+          "empirical_accuracy": 0.7241
+        },
+        {
+          "range": [
+            0.8,
+            0.9
+          ],
+          "n": 25125,
+          "avg_confidence": 0.8598,
+          "empirical_accuracy": 0.846
+        },
+        {
+          "range": [
+            0.9,
+            1.0
+          ],
+          "n": 51422,
+          "avg_confidence": 0.9409,
+          "empirical_accuracy": 0.9523
+        }
+      ]
+    },
+    "validated": true,
+    "model_path": "1h_lgbm.joblib"
+  },
+  "4h": {
+    "horizon": "4h",
+    "horizon_label": "4 sata",
+    "n_examples": 26028,
+    "trained_at": 1795462310,
+    "feature_names": [
+      "rsi14",
+      "stoch_rsi14",
+      "macd_hist_norm",
+      "ema9_dist",
+      "ema21_dist",
+      "ema50_dist",
+      "ema200_dist",
+      "sma20_dist",
+      "sma50_dist",
+      "sma200_dist",
+      "atr14_norm",
+      "atr_percentile100",
+      "bb_pct_b",
+      "bb_bandwidth",
+      "roc5",
+      "roc10",
+      "roc20",
+      "volume_rel20",
+      "dist_from_high20",
+      "dist_from_low20"
+    ],
+    "classes": [
+      "up",
+      "down",
+      "sideways"
+    ],
+    "lightgbm_walk_forward": {
+      "n": 20823,
+      "brier_score": 0.42021,
+      "baseline_brier_score": 0.42949,
+      "log_loss": 0.77544,
+      "baseline_log_loss": 0.7689,
+      "accuracy": 0.7296,
+      "baseline_accuracy": 0.7313,
+      "reliability": [
+        {
+          "range": [
+            0.3,
+            0.4
+          ],
+          "n": 33,
+          "avg_confidence": 0.3716,
+          "empirical_accuracy": 0.3636
+        },
+        {
+          "range": [
+            0.4,
+            0.5
+          ],
+          "n": 203,
+          "avg_confidence": 0.4621,
+          "empirical_accuracy": 0.4778
+        },
+        {
+          "range": [
+            0.5,
+            0.6
+          ],
+          "n": 1537,
+          "avg_confidence": 0.573,
+          "empirical_accuracy": 0.5556
+        },
+        {
+          "range": [
+            0.6,
+            0.7
+          ],
+          "n": 7731,
+          "avg_confidence": 0.6582,
+          "empirical_accuracy": 0.6726
+        },
+        {
+          "range": [
+            0.7,
+            0.8
+          ],
+          "n": 8186,
+          "avg_confidence": 0.7437,
+          "empirical_accuracy": 0.7692
+        },
+        {
+          "range": [
+            0.8,
+            0.9
+          ],
+          "n": 2647,
+          "avg_confidence": 0.8392,
+          "empirical_accuracy": 0.864
+        },
+        {
+          "range": [
+            0.9,
+            1.0
+          ],
+          "n": 486,
+          "avg_confidence": 0.9307,
+          "empirical_accuracy": 0.9177
+        }
+      ]
+    },
+    "logreg_walk_forward": {
+      "n": 20823,
+      "brier_score": 0.42792,
+      "baseline_brier_score": 0.42949,
+      "log_loss": 0.84043,
+      "baseline_log_loss": 0.7689,
+      "accuracy": 0.7271,
+      "baseline_accuracy": 0.7313,
+      "reliability": [
+        {
+          "range": [
+            0.3,
+            0.4
+          ],
+          "n": 29,
+          "avg_confidence": 0.3801,
+          "empirical_accuracy": 0.2759
         },
         {
           "range": [
@@ -434,65 +303,64 @@
             0.5
           ],
           "n": 371,
-          "avg_confidence": 0.4482,
-          "empirical_accuracy": 0.5067
+          "avg_confidence": 0.474,
+          "empirical_accuracy": 0.4474
         },
         {
           "range": [
             0.5,
             0.6
           ],
-          "n": 913,
-          "avg_confidence": 0.5773,
-          "empirical_accuracy": 0.5717
+          "n": 1553,
+          "avg_confidence": 0.5607,
+          "empirical_accuracy": 0.5834
         },
         {
           "range": [
             0.6,
             0.7
           ],
-          "n": 4330,
-          "avg_confidence": 0.6485,
-          "empirical_accuracy": 0.6446
+          "n": 5312,
+          "avg_confidence": 0.6566,
+          "empirical_accuracy": 0.6849
         },
         {
           "range": [
             0.7,
             0.8
           ],
-          "n": 1054,
-          "avg_confidence": 0.7207,
-          "empirical_accuracy": 0.6945
+          "n": 11069,
+          "avg_confidence": 0.7444,
+          "empirical_accuracy": 0.7497
         },
         {
           "range": [
             0.8,
             0.9
           ],
-          "n": 82,
-          "avg_confidence": 0.8326,
-          "empirical_accuracy": 0.7073
+          "n": 2422,
+          "avg_confidence": 0.8254,
+          "empirical_accuracy": 0.858
         },
         {
           "range": [
             0.9,
             1.0
           ],
-          "n": 4,
-          "avg_confidence": 1.0,
-          "empirical_accuracy": 0.0
+          "n": 67,
+          "avg_confidence": 0.9329,
+          "empirical_accuracy": 0.7015
         }
       ]
     },
-    "validated": false,
-    "reason": "LightGBM Brier score (0.52605) nije bolji od naivne bazne linije (0.52504) na walk-forward testu - model NE pokazuje stvarnu prednost na ovom horizontu s dostupnim podacima. Live signal za ovaj horizont vraća WAIT.",
-    "model_path": "24h_lgbm.joblib"
+    "validated": true,
+    "model_path": "4h_lgbm.joblib"
   },
-  "7d": {
-    "horizon": "7d",
-    "horizon_label": "7 dana",
-    "n_examples": 8441,
-    "trained_at": 1795461163,
+  "24h": {
+    "horizon": "24h",
+    "horizon_label": "24 sata",
+    "n_examples": 11383,
+    "trained_at": 1795462313,
     "feature_names": [
       "rsi14",
       "stoch_rsi14",
@@ -521,146 +389,321 @@
       "sideways"
     ],
     "lightgbm_walk_forward": {
-      "n": 6753,
-      "brier_score": 0.56738,
-      "baseline_brier_score": 0.55622,
-      "log_loss": 1.28198,
-      "baseline_log_loss": 0.94363,
-      "accuracy": 0.5885,
-      "baseline_accuracy": 0.6031,
+      "n": 9107,
+      "brier_score": 0.51349,
+      "baseline_brier_score": 0.51368,
+      "log_loss": 0.97981,
+      "baseline_log_loss": 0.88637,
+      "accuracy": 0.6499,
+      "baseline_accuracy": 0.6528,
       "reliability": [
         {
           "range": [
             0.3,
             0.4
           ],
-          "n": 40,
-          "avg_confidence": 0.3774,
-          "empirical_accuracy": 0.3
+          "n": 24,
+          "avg_confidence": 0.3776,
+          "empirical_accuracy": 0.3333
         },
         {
           "range": [
             0.4,
             0.5
           ],
-          "n": 451,
-          "avg_confidence": 0.4621,
-          "empirical_accuracy": 0.4701
+          "n": 238,
+          "avg_confidence": 0.4689,
+          "empirical_accuracy": 0.5084
         },
         {
           "range": [
             0.5,
             0.6
           ],
-          "n": 2913,
-          "avg_confidence": 0.557,
-          "empirical_accuracy": 0.5695
+          "n": 956,
+          "avg_confidence": 0.5718,
+          "empirical_accuracy": 0.5816
         },
         {
           "range": [
             0.6,
             0.7
           ],
-          "n": 3061,
-          "avg_confidence": 0.644,
-          "empirical_accuracy": 0.6103
+          "n": 6018,
+          "avg_confidence": 0.6499,
+          "empirical_accuracy": 0.6457
         },
         {
           "range": [
             0.7,
             0.8
           ],
-          "n": 272,
-          "avg_confidence": 0.7229,
-          "empirical_accuracy": 0.7757
+          "n": 1786,
+          "avg_confidence": 0.7253,
+          "empirical_accuracy": 0.7156
         },
         {
           "range": [
             0.8,
             0.9
           ],
-          "n": 16,
-          "avg_confidence": 0.8366,
-          "empirical_accuracy": 0.75
-        }
-      ]
-    },
-    "logreg_walk_forward": {
-      "n": 6753,
-      "brier_score": 0.55675,
-      "baseline_brier_score": 0.55622,
-      "log_loss": 1.06288,
-      "baseline_log_loss": 0.94363,
-      "accuracy": 0.5966,
-      "baseline_accuracy": 0.6031,
-      "reliability": [
-        {
-          "range": [
-            0.3,
-            0.4
-          ],
-          "n": 4,
-          "avg_confidence": 0.3883,
-          "empirical_accuracy": 0.5
-        },
-        {
-          "range": [
-            0.4,
-            0.5
-          ],
-          "n": 881,
-          "avg_confidence": 0.4628,
-          "empirical_accuracy": 0.4994
-        },
-        {
-          "range": [
-            0.5,
-            0.6
-          ],
-          "n": 2706,
-          "avg_confidence": 0.5618,
-          "empirical_accuracy": 0.5721
-        },
-        {
-          "range": [
-            0.6,
-            0.7
-          ],
-          "n": 2793,
-          "avg_confidence": 0.643,
-          "empirical_accuracy": 0.6294
-        },
-        {
-          "range": [
-            0.7,
-            0.8
-          ],
-          "n": 340,
-          "avg_confidence": 0.7303,
-          "empirical_accuracy": 0.7706
-        },
-        {
-          "range": [
-            0.8,
-            0.9
-          ],
-          "n": 22,
-          "avg_confidence": 0.8342,
-          "empirical_accuracy": 0.6818
+          "n": 81,
+          "avg_confidence": 0.8287,
+          "empirical_accuracy": 0.8148
         },
         {
           "range": [
             0.9,
             1.0
           ],
-          "n": 7,
-          "avg_confidence": 0.9515,
-          "empirical_accuracy": 0.5714
+          "n": 4,
+          "avg_confidence": 0.9165,
+          "empirical_accuracy": 1.0
+        }
+      ]
+    },
+    "logreg_walk_forward": {
+      "n": 9107,
+      "brier_score": 0.51422,
+      "baseline_brier_score": 0.51368,
+      "log_loss": 0.95163,
+      "baseline_log_loss": 0.88637,
+      "accuracy": 0.6479,
+      "baseline_accuracy": 0.6528,
+      "reliability": [
+        {
+          "range": [
+            0.3,
+            0.4
+          ],
+          "n": 49,
+          "avg_confidence": 0.3859,
+          "empirical_accuracy": 0.5102
+        },
+        {
+          "range": [
+            0.4,
+            0.5
+          ],
+          "n": 434,
+          "avg_confidence": 0.462,
+          "empirical_accuracy": 0.5161
+        },
+        {
+          "range": [
+            0.5,
+            0.6
+          ],
+          "n": 1412,
+          "avg_confidence": 0.5644,
+          "empirical_accuracy": 0.5637
+        },
+        {
+          "range": [
+            0.6,
+            0.7
+          ],
+          "n": 4703,
+          "avg_confidence": 0.651,
+          "empirical_accuracy": 0.647
+        },
+        {
+          "range": [
+            0.7,
+            0.8
+          ],
+          "n": 2404,
+          "avg_confidence": 0.7253,
+          "empirical_accuracy": 0.7209
+        },
+        {
+          "range": [
+            0.8,
+            0.9
+          ],
+          "n": 105,
+          "avg_confidence": 0.844,
+          "empirical_accuracy": 0.7524
         }
       ]
     },
     "validated": false,
-    "reason": "LightGBM Brier score (0.56738) nije bolji od naivne bazne linije (0.55622) na walk-forward testu - model NE pokazuje stvarnu prednost na ovom horizontu s dostupnim podacima. Live signal za ovaj horizont vraća WAIT.",
+    "reason": "LightGBM Brier score (0.51349) nije bolji od naivne bazne linije (0.51368) na walk-forward testu - model NE pokazuje stvarnu prednost na ovom horizontu s dostupnim podacima. Live signal za ovaj horizont vraća WAIT.",
+    "model_path": "24h_lgbm.joblib"
+  },
+  "7d": {
+    "horizon": "7d",
+    "horizon_label": "7 dana",
+    "n_examples": 11359,
+    "trained_at": 1795462315,
+    "feature_names": [
+      "rsi14",
+      "stoch_rsi14",
+      "macd_hist_norm",
+      "ema9_dist",
+      "ema21_dist",
+      "ema50_dist",
+      "ema200_dist",
+      "sma20_dist",
+      "sma50_dist",
+      "sma200_dist",
+      "atr14_norm",
+      "atr_percentile100",
+      "bb_pct_b",
+      "bb_bandwidth",
+      "roc5",
+      "roc10",
+      "roc20",
+      "volume_rel20",
+      "dist_from_high20",
+      "dist_from_low20"
+    ],
+    "classes": [
+      "up",
+      "down",
+      "sideways"
+    ],
+    "lightgbm_walk_forward": {
+      "n": 9088,
+      "brier_score": 0.55088,
+      "baseline_brier_score": 0.54369,
+      "log_loss": 1.11219,
+      "baseline_log_loss": 0.92696,
+      "accuracy": 0.605,
+      "baseline_accuracy": 0.6188,
+      "reliability": [
+        {
+          "range": [
+            0.3,
+            0.4
+          ],
+          "n": 45,
+          "avg_confidence": 0.3709,
+          "empirical_accuracy": 0.2889
+        },
+        {
+          "range": [
+            0.4,
+            0.5
+          ],
+          "n": 735,
+          "avg_confidence": 0.4656,
+          "empirical_accuracy": 0.4789
+        },
+        {
+          "range": [
+            0.5,
+            0.6
+          ],
+          "n": 3371,
+          "avg_confidence": 0.5622,
+          "empirical_accuracy": 0.574
+        },
+        {
+          "range": [
+            0.6,
+            0.7
+          ],
+          "n": 4080,
+          "avg_confidence": 0.6477,
+          "empirical_accuracy": 0.623
+        },
+        {
+          "range": [
+            0.7,
+            0.8
+          ],
+          "n": 833,
+          "avg_confidence": 0.7289,
+          "empirical_accuracy": 0.7635
+        },
+        {
+          "range": [
+            0.8,
+            0.9
+          ],
+          "n": 21,
+          "avg_confidence": 0.8341,
+          "empirical_accuracy": 0.9048
+        },
+        {
+          "range": [
+            0.9,
+            1.0
+          ],
+          "n": 3,
+          "avg_confidence": 0.9773,
+          "empirical_accuracy": 0.3333
+        }
+      ]
+    },
+    "logreg_walk_forward": {
+      "n": 9088,
+      "brier_score": 0.53965,
+      "baseline_brier_score": 0.54369,
+      "log_loss": 0.9862,
+      "baseline_log_loss": 0.92696,
+      "accuracy": 0.6144,
+      "baseline_accuracy": 0.6188,
+      "reliability": [
+        {
+          "range": [
+            0.3,
+            0.4
+          ],
+          "n": 55,
+          "avg_confidence": 0.3724,
+          "empirical_accuracy": 0.2545
+        },
+        {
+          "range": [
+            0.4,
+            0.5
+          ],
+          "n": 405,
+          "avg_confidence": 0.4693,
+          "empirical_accuracy": 0.5457
+        },
+        {
+          "range": [
+            0.5,
+            0.6
+          ],
+          "n": 3125,
+          "avg_confidence": 0.5592,
+          "empirical_accuracy": 0.5606
+        },
+        {
+          "range": [
+            0.6,
+            0.7
+          ],
+          "n": 4836,
+          "avg_confidence": 0.6467,
+          "empirical_accuracy": 0.64
+        },
+        {
+          "range": [
+            0.7,
+            0.8
+          ],
+          "n": 601,
+          "avg_confidence": 0.7401,
+          "empirical_accuracy": 0.7488
+        },
+        {
+          "range": [
+            0.8,
+            0.9
+          ],
+          "n": 66,
+          "avg_confidence": 0.8373,
+          "empirical_accuracy": 0.7879
+        }
+      ]
+    },
+    "validated": false,
+    "reason": "LightGBM Brier score (0.55088) nije bolji od naivne bazne linije (0.54369) na walk-forward testu - model NE pokazuje stvarnu prednost na ovom horizontu s dostupnim podacima. Live signal za ovaj horizont vraća WAIT.",
     "model_path": "7d_lgbm.joblib"
   }
 }

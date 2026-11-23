@@ -6,9 +6,7 @@ Ovo NIJE pravna analiza niti zamjena za praćenje stvarnih regulatornih vijesti 
 automatski generiran indikator, ne kao pouzdan zaključak. Za stvarne odluke pročitaj originalne
 objave.
 
-NAPOMENA O POUZDANOSTI: RSS URL-ovi i format prema javno poznatim feedovima u trenutku pisanja
-koda, nisu uživo testirani u ovom okruženju (nema izlaznog pristupa internetu).
-"""
+UŽIVO TESTIRANO (23.11.2026.) - radi, oba feeda (SEC i CFTC) vraćaju stvarne objave."""
 import calendar
 import time
 

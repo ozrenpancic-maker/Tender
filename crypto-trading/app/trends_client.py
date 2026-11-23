@@ -5,7 +5,8 @@ pristupa pa ovo može prestati raditi bez najave, vraćati prazne rezultate ili 
 Koristi se za "nagli porast interesa" signal (porast pretraga za 'bitcoin'/'crypto' često prethodi
 velikom pokretu cijene - iz korisnikovog popisa čimbenika).
 
-NAPOMENA O POUZDANOSTI: nije uživo testirano u ovom okruženju (nema izlaznog pristupa internetu).
+UŽIVO TESTIRANO (23.11.2026.) - radi, ali gornji rizik (pytrends je scraping, ne službeni API,
+Google ga može zaustaviti bez najave) stoji i dalje.
 Ovo je od svih dodanih izvora najkrhkiji - ako "Testiraj vezu" ne uspije, prvo provjeri je li
 pytrends i dalje održavan/kompatibilan s trenutnom Google Trends stranicom prije traženja bugova
 u ovom kodu.

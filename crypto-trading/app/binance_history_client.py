@@ -7,8 +7,11 @@ Za razliku od `app/kripto.py` (ZIP arhive, bulk povijesni import), ovo je jednos
 poziv prikladan za dodavanje pojedinačnih parova na zahtjev (npr. coinovi iz tvog stvarnog
 portfelja koje izvorni paket nije pokrivao).
 
-NAPOMENA O POUZDANOSTI: endpoint prema javnoj Binance REST API dokumentaciji, nije uživo testiran
-u ovom okruženju (nema izlaznog pristupa internetu).
+UŽIVO TESTIRANO (23.11.2026., okruženje s izlaznim internet pristupom): HTTP 451 - Binance
+geografski blokira ovu lokaciju/IP (po njihovim Uvjetima korištenja), neovisno o internet
+pristupu - vidi istu napomenu u `app/binance_derivatives_client.py`. Za povijesne podatke koristi
+`app/binance_vision_client.py` (statična bulk arhiva, NIJE pod istim ograničenjem, uživo
+potvrđeno radi) - ovaj REST klijent ostaje u kodu za slučaj da korisnikova lokacija nije blokirana.
 """
 import time
 

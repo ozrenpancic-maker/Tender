@@ -2,10 +2,11 @@
 API-ja za ovo (BlackRock/Fidelity/Ark/Grayscale ne objavljuju zajednički feed) - umjesto toga
 scrapa se javno dostupna tablica s farside.co.uk, uobičajen besplatan izvor za ovaj podatak.
 
-NAPOMENA O POUZDANOSTI (isto kao EOJN scraper u glavnoj Tender aplikaciji): HTML struktura
-farside.co.uk NIJE provjerena uživo (nema internet pristupa u ovom okruženju) i vjerojatno će
-trebati prilagodba selektora. Provjeri i Uvjete korištenja te stranice prije redovitog
-automatiziranog pristupa.
+UŽIVO TESTIRANO (23.11.2026., okruženje s izlaznim internet pristupom): HTTP 403 - farside.co.uk
+je iza Cloudflare zaštite protiv botova ("Just a moment..." JS-challenge stranica), ne vraća
+stvarni HTML s tablicom čak i uz normalan internet pristup. To znači da `httpx` (bez izvršavanja
+JavaScripta) ovdje ne može proći - treba headless preglednik (Playwright/Selenium) ili drugi izvor
+podataka. Provjeri i Uvjete korištenja te stranice prije ikakvog automatiziranog pristupa.
 """
 import re
 import time

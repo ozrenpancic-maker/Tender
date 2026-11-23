@@ -53,43 +53,40 @@ razinama pouzdanosti.
    je tržište volatilnije i kad je horizont dulji, manja kad je mirno. Label na indeksu `i` gleda
    `candles[i + steps_ahead].close` - to je JEDINO mjesto u cijelom pipelineu gdje se gleda
    unaprijed, namjerno odvojeno od značajki.
-3. **Walk-forward validacija** (`app/ml/dataset.py`) - podaci (pooled BTC/ETH/SOL, parovi se NE
-   kodiraju kao značajka) podijeljeni kronološki u foldove; za svaki fold: train (expanding
+3. **Walk-forward validacija** (`app/ml/dataset.py`) - podaci (pooled BTC/ETH/SOL/XRP, parovi se
+   NE kodiraju kao značajka) podijeljeni kronološki u foldove; za svaki fold: train (expanding
    window) → zadnjih 20% toga je kalibracijski skup (izolirana kalibracija vjerojatnosti preko
-   `CalibratedClassifierCV` s izotoničnom regresijom) → test na SLJEDEĆEM, još neviđenom bloku.
-   Nijedan test primjer nikad nije korišten za fit ili kalibraciju bilo kojeg modela koji ga
-   predviđa - standardna zaštita od look-ahead/data leakage biasa.
+   `CalibratedClassifierCV` s izotoničnom regresijom) → test na SLJEDEĆEM, još neviđenom bloku, uz
+   `purge_seconds` čišćenje granice (vidi "Druga runda" ispod). Nijedan test primjer nikad nije
+   korišten za fit ili kalibraciju bilo kojeg modela koji ga predviđa.
 4. **Kalibracija i poštena provjera** (`app/ml/calibration.py`) - Brier score (multiklasni),
    log loss, reliability dijagram (pouzdanost vs stvarna točnost po binovima), i NAIVNA bazna
    linija (model koji uvijek predviđa udio klasa iz treninga, "ne znam ništa"). Model se smatra
    **validiranim** samo ako je njegov Brier score barem 2% relativno bolji od bazne linije na
    walk-forward testu (pravilo #12/#13: nevalidiran model ne aktivira live preporuku).
 
-### Pošten rezultat prvog treniranja (23.11.2026., nad podacima dostupnim u ovom razvojnom okruženju)
+### Rezultat treniranja nakon pravog internet pristupa (23.11.2026. - vidi "Četvrta runda" ispod)
+
+Prva verzija (113 dana resampliranih 1h/4h podataka) nije validirala NIŠTA. Nakon što je okruženju
+dopušten izlazni internet pristup, sinkronizirana je PRAVA 3-godišnja 1h/4h povijest (ne resample)
+za BTC/ETH/SOL/XRP preko `app/binance_vision_client.py` - uzorak je narastao 14-18x:
 
 | Horizont | Uzorak (n) | LightGBM Brier | Bazna linija Brier | Validiran? |
 |---|---|---|---|---|
-| 1h | 7533 (resample 5-min→1h, 113 dana) | 0,1107 | 0,1112 | **NE** (razlika unutar šuma) |
-| 4h | 1431 (resample 5-min→4h, 113 dana) | 0,4057 | 0,3784 | **NE** (lošiji od bazne linije) |
-| 24h | 8459 (prava dnevna povijest, 2017/2020-2026) | 0,5262 | 0,5250 | **NE** |
-| 7d | 8441 (prava dnevna povijest, label 7 dana unaprijed) | 0,5669 | 0,5562 | **NE** |
+| 1h | 106.524 (prava 1h povijest, 3 god., 4 para) | 0,1798 | 0,1916 | **DA** ✅ (6,1% bolji) |
+| 4h | 26.028 (prava 4h povijest, 3 god., 4 para) | 0,4202 | 0,4295 | **DA** ✅ (2,2% bolji) |
+| 24h | 11.383 (prava dnevna povijest + XRP) | 0,5135 | 0,5137 | NE |
+| 7d | 11.359 (prava dnevna povijest + XRP) | 0,5509 | 0,5437 | NE |
 
-**Nijedan horizont trenutno nije prošao validaciju.** `/api/predictions` zato za sve coinove/
-horizonte vraća `"NEMA DOVOLJNO POUZDANIH PODATAKA"` - to je pravilo #8 na djelu (nepouzdan model →
-WAIT, ne izmišljena sigurnost), ne greška u kodu. Ovo je konzistentno s ranijim nalazom u ovom
-projektu (vidi "Ključni nalaz" ispod) da jednostavni mehanički signali na BTC/ETH/SOL ne pokazuju
-robusnu prednost nad "ne radi ništa" - ML pristup s ovim značajkama i ovom količinom podataka to
-potvrđuje na stroži, kalibriran način, ne osporava.
+**Prvi put u ovom projektu model stvarno validira** - za 1h i 4h horizont. `/api/predictions` za
+te horizonte sada vraća PRAVU kalibriranu predikciju (P(up)/P(down)/P(sideways), AI Score, BUY/
+WAIT/SELL), ne automatski WAIT. 24h/7d i dalje vraćaju WAIT, konzistentno s ranijim nalazom da je
+dnevni/tjedni horizont teži za ovaj feature-set.
 
-Što bi moglo promijeniti ovo (poštene, ne zagarantirane ideje za sljedeću iteraciju):
-- Više povijesti za 1h/4h (sinkroniziraj izravno s Binancea nekoliko godina 1h/4h svijeća, ne samo
-  113 dana resampliranih iz 5-min) - trenutni uzorak za 4h je posebno tanak (1431 primjera).
-- Dodatne značajke iz već postojećih klijenata u ovoj app-i (makro, derivatives funding/OI,
-  sentiment, on-chain) - trenutni model vidi SAMO cijenu/volumen, ništa od ostatka faza 1 podataka.
-- Drugi feature inženjering (npr. relativna snaga parova, market regime kao ulazna značajka).
-- Prag "validiran" (2% relativno bolji Brier) je namjerno strog da se spriječi lažno pozitivan
-  rezultat (prva verzija s pragom 0% je "validirala" 1h horizont s poboljšanjem od samo 0,0005 -
-  vjerojatno šum, ne stvarna vještina, zbog jako neravnomjerne raspodjele klasa na 1h).
+**Poštena napomena o marginalnosti**: 4h prolazi s 2,2% poboljšanjem, tik iznad 2% pragova - to je
+"prolazi, ali ne s velikom rezervom", ne "dokazano pouzdano". Prag postoji baš da takve granične
+slučajeve ne proglasi lažno sigurnima bez daljnje provjere (npr. paper trading kroz stvaran budući
+period). 1h ima više prostora (6,1%), nešto čvršći rezultat.
 
 ### AI Score formula (transparentna, ne "crna kutija")
 
@@ -106,7 +103,7 @@ ocjena kvalitete+smjera, NE izravna vjerojatnost rasta (pravilo #7) - vjerojatno
 
 ```bash
 cd crypto-trading && source .venv/bin/activate
-pip install lightgbm scikit-learn joblib   # ako već nisu instalirani
+pip install lightgbm scikit-learn joblib shap   # ako već nisu instalirani
 python3 -m app.ml.train
 ```
 
@@ -116,11 +113,22 @@ ponovno piše iste datoteke, ne mijenja ništa drugo u bazi.
 
 ### Razlozi za/protiv (`reasons_for`/`reasons_against`)
 
-Namjerno NISU SHAP vrijednosti (ta ovisnost bi se mogla dodati u fazi 6 ako pokaže mjerljivu
-korist) - to su jednostavna, provjerljiva pravila koja izravno čitaju vrijednost značajke i
-uspoređuju s dokumentiranim pragom (npr. "RSI14 < 30 → razlog za", "cijena iznad EMA200 → razlog
-za"). Transparentnije za sada nego aproksimacija važnosti značajki iz modela, iako manje precizno
-povezano sa stvarnom odlukom tog konkretnog modela.
+Koriste `shap.TreeExplainer` nad stvarnim LightGBM modelom (izvučenim iz `CalibratedClassifierCV`
+omota) - PRAVI doprinosi značajki TOJ KONKRETNOJ predikciji, ne interpretacija vrijednosti
+značajke. Odgovor uvijek ima `reasons_method` ("shap" ili "heuristic_fallback") - stara
+heuristika (jednostavna pravila, npr. "RSI14 < 30 → razlog za") ostaje kao fallback ako SHAP iz
+nekog razloga ne uspije.
+
+### Uživo dohvat podataka: Coinbase, ne Binance
+
+Model je TRENIRAN na Binance podacima (`app/binance_vision_client.py`), ali UŽIVO predikcija
+dohvaća najnoviju cijenu/svijeću s **Coinbase-a** (`app/coinbase_client.py`), ne s Binancea -
+Binance REST API je geografski blokiran iz ovog razvojnog okruženja (vidi "Četvrta runda" ispod).
+'BTC/USDT' se mapira na Coinbaseov 'BTC-USD' - USDT i USD su stablecoin/fiat s razlikom tipično
+ispod 0,1%, prihvatljiva aproksimacija JER je svaka značajka u modelu omjer/postotak (RSI,
+EMA-udaljenost...), nikad apsolutna cijena u određenoj valuti. Coinbase nema izravnu 4h
+granulaciju - za "4h" horizont dohvate se 1h svijeće (paginirano, Coinbase ograničava na ~300
+svijeća po pozivu) i agregiraju u 4h (`resample_candles`).
 
 ## Signali kupi/prodaj (`app/signals.py`, dashboard odjeljak 2)
 
@@ -148,8 +156,9 @@ stvarno kupio pojedini coin - pa bi uvjet izlaska bio neupotrebljiv/pogrešan iz
 `app/signals.py` namjerno koristi samo STATELESS strategije (presjek dviju pokretnih prosjeka,
 izračunljiv iz same trenutne i prethodne svijeće, bez potrebe za pamćenjem povijesti poziva).
 
-**Kako radi**: `compute_signal(pair, horizon)` dohvaća najnovije svijeće uživo (Binance, bez ključa)
-i pokreće `decide()` ISTE funkcije koja se koristi u backtestu, dva puta - jednom s
+**Kako radi**: `compute_signal(pair, horizon)` dohvaća najnovije svijeće uživo (Coinbase, bez
+ključa - vidi "Četvrta runda" niže zašto ne Binance) i pokreće `decide()` ISTE funkcije koja se
+koristi u backtestu, dva puta - jednom s
 `in_position=True` (tvoja stvarna situacija za sve coinove iz portfelja - daje DRŽI/PRODAJ) i jednom
 s `in_position=False` (da dokupljuješ/ponovno ulaziš - daje ČEKAJ/KUPI). Nema posebne logike za
 "live" - identičan kod kao backtest, samo pozvan jednom na zadnju svijeću umjesto u petlji.
@@ -162,9 +171,8 @@ s `in_position=False` (da dokupljuješ/ponovno ulaziš - daje ČEKAJ/KUPI). Nema
 
 **I dalje vrijedi**: ovo su mehanički signali iz koda koji može biti u krivu, ne preporuke
 financijskog savjetnika. Kratkoročni preset nije testiran na konkretnim coinovima iz portfelja -
-samo na BTC/ETH/SOL. Ako "Osvježi signale" javi grešku, isti je razlog kao svugdje u ovom README-u
-- ovo razvojno okruženje nema izlazni pristup internetu da bi se Binance pozivi mogli uživo
-testirati; logika je potvrđena korištenjem stvarnih (ne izmišljenih) 4h BTC podataka već u bazi.
+samo na BTC/ETH/SOL. "Osvježi signale" radi uživo (Coinbase, potvrđeno) - svih 7 portfolio coinova
+(XRP, SUI, PEPE, DOGE, POL, NEAR, ALGO) su uživo testirani dostupni.
 
 ## Ključni nalaz od kojeg se kreće
 
@@ -406,14 +414,71 @@ postavljen (default), ponašanje je nepromijenjeno. Dashboard ima jednostavno po
   `CalibratedClassifierCV` omota) za PRAVE doprinose značajki TOJ KONKRETNOJ predikciji, ne
   interpretaciju vrijednosti značajki. Stara heuristika je ostala kao fallback (`reasons_method`
   u odgovoru govori koja je metoda stvarno korištena) ako SHAP iz nekog razloga ne uspije.
-- ❌ **1h/4h pokrivenost (~113 dana)** i ❌ **XRP puna povijest** - oboje zahtijevaju NOVI stvarni
-  dohvat povijesti s Binancea; ovo razvojno okruženje nema pristup internetu, pa se ne mogu
-  stvarno riješiti ovdje. Pokreni `/api/binance-history/sync` (za XRP/duže 4h/1h serije) ili
-  `DOHVATI_XRP.cmd` iz ChatGPT-ovog paketa kad imaš internet.
-- ❌ **Mrežni pozivi i Android APK build** - provjereno: Gradle 8.14 postoji u ovom okruženju, ALI
-  Android SDK (compileSdk/build-tools) nije instaliran i preuzimanje bi trebalo pristup internetu
-  (vjerojatno blokiran isto kao i svi drugi vanjski API pozivi) - nisam ni pokušao, da ne trošim
-  vrijeme na siguran neuspjeh. I dalje samo statička provjera koda, ne stvarni build/test.
+- ✅ **1h/4h pokrivenost** i ✅ **XRP puna povijest** - RIJEŠENO u "Četvrtoj rundi" ispod, nakon što
+  je okruženju dopušten izlazni internet pristup.
+- ✅ **Mrežni pozivi i Android APK build** - RIJEŠENO, vidi "Četvrta runda" ispod.
+
+### Četvrta runda - pravi internet pristup dopušten (23.11.2026.)
+
+Korisnik je ovom okruženju dopustio izlazni internet pristup i pregled svih domena. Rezultat: 2 od
+3 prethodno "trajno blokirane" stavke su genuinski riješene, plus niz drugih poboljšanja koja to
+otkriva.
+
+**Binance REST API je geografski blokiran (HTTP 451) - ovo NIJE problem s internet pristupom.**
+`api.binance.com` i `fapi.binance.com` odbijaju ovu lokaciju/IP po Binanceovim Uvjetima korištenja,
+neovisno o tome ima li okruženje internet - vidi napomenu u `app/binance_history_client.py` i
+`app/binance_derivatives_client.py`. **ALI `data.binance.vision` (statična bulk arhiva povijesnih
+svijeća, isti podaci kao REST API, samo unaprijed spremljeni u ZIP/CSV arhive po mjesecu) NIJE pod
+istim ograničenjem i radi normalno** - uživo potvrđeno. Novi `app/binance_vision_client.py`
+koristi upravo to:
+
+- **Puna XRP/USDT dnevna povijest** sinkronizirana (2018-05 do danas, 3125 svijeća) - prvi put u
+  ovom projektu. XRP je uključen u pooled ML trening (vidi iznad) i dostupan za backtest/strategije.
+- **Prava 3-godišnja 1h i 4h povijest** (ne resample iz 113 dana 5-min podataka) za BTC/ETH/SOL/
+  XRP, sinkronizirana od 2023-11 (26.832 1h-svijeća i 6.708 4h-svijeća po paru). Zamjenjuje
+  prijašnji resample pristup u `app/ml/dataset.py`.
+- **Usput otkriven i popravljen pravi bug**: Binance je neke exportove 2025.+ prebacio s
+  MILIsekundnih na MIKROsekundne vremenske oznake (upravo to na što je izvorna specifikacija
+  upozoravala) - stariji monthly arhivi (2024.) koriste 13-znamenkaste (ms) vrijednosti, noviji
+  daily arhivi (2026.) 16-znamenkaste (µs). `_to_seconds()` u `binance_vision_client.py` razlikuje
+  po veličini broja (>10^14 = µs), ne po datumu arhive (sigurnije po redu podataka, ne po
+  pretpostavci).
+
+**Uživo dohvat je prebačen s Binancea (blokiran) na Coinbase (radi)** - i za AI Prediction Engine
+(`app/ml/engine.py`) i za rule-based Signali kupi/prodaj (`app/signals.py`). Svih 7 korisnikovih
+portfolio coinova (XRP, SUI, PEPE, DOGE, POL, NEAR, ALGO) su uživo potvrđeni dostupni na Coinbaseu
+(`{COIN}-USD`). `app/coinbase_client.py` proširen s proizvoljnom granulacijom
+(`get_public_candles`) i paginacijom preko Coinbaseovog limita od ~300 svijeća po pozivu
+(`get_public_candles_paginated`) - potreban za 4h (dohvat 1h + resample) i dulje "long" preset
+razdoblje (400 dana).
+
+**ML rezultat** (vidi "AI Prediction Engine" iznad za detalje): nakon ponovnog treniranja na
+pravoj, puno većoj povijesti, **1h i 4h horizont prvi put validiraju**. 24h i 7d i dalje ne.
+
+**Android APK se stvarno izgradio** - prije se samo pisalo da Gradle postoji, ali Android SDK
+nije bio instaliran. Preuzet je `commandlinetools` + `platform-34` + `build-tools;34.0.0` preko
+`sdkmanager` (dl.google.com dostupan), `gradle assembleDebug` je prošao, APK je potpisan
+(debug ključ) i provjeren (`aapt dump badging`, `apksigner verify`) - stvaran, instalabilan
+`app-debug.apk` (5,6 MB), poslan korisniku. Ovo i dalje NIJE release/produkcijski potpisan build
+niti testiran na stvarnom uređaju (nema Android emulatora/uređaja u ovom okruženju) - samo prvi
+put stvarno POTVRĐENO da se projekt kompajlira i pakira u instalabilan APK.
+
+**Ostali klijenti, uživo testirani prvi put (vidi dokumentaciju u svakoj datoteci za detalje)**:
+
+| Klijent | Status |
+|---|---|
+| `coinbase_client.py` | ✅ radi |
+| `defillama_client.py` | ✅ radi |
+| `coingecko_client.py` | ✅ radi |
+| `trends_client.py` (Google Trends) | ✅ radi |
+| `regulatory_client.py` (SEC/CFTC RSS) | ✅ radi |
+| `fred_client.py` | ⚠️ treba besplatan API ključ (nepromijenjeno) |
+| `reddit_client.py` | ⚠️ treba besplatan client ID/secret (nepromijenjeno) |
+| `cryptopanic_client.py` | ⚠️ treba besplatan API ključ (nepromijenjeno) |
+| `binance_history_client.py`, `binance_derivatives_client.py` | ❌ Binance geografski blokira ovu lokaciju (HTTP 451) - vidi gore |
+| `etf_client.py` (farside.co.uk) | ❌ Cloudflare bot-zaštita (403, JS-challenge) - treba headless preglednik, ne `httpx` |
+| `github_client.py` | ❌ OVO SPECIFIČNO sandbox okruženje blokira izravne REST pozive prema api.github.com (traži korištenje vlastitog GitHub alata) - na korisnikovom računalu bi trebalo raditi normalno |
+| `equity_client.py` (Stooq) | ❌ Veza se prekida na razini proxyja (TLS handshake timeout), ne čist HTTP odbijaj - nije dalje istraživano |
 
 ## Arhitektura
 
@@ -440,8 +505,12 @@ postavljen (default), ponašanje je nepromijenjeno. Dashboard ima jednostavno po
   bez ključa), za makro-filter strategije. `app/aux.py` poravnava kripto (trguje se 7 dana u tjednu)
   i equity/zlato (zatvoreno vikendom) kalendare uzimanjem zadnje poznate cijene na/prije danog dana.
 - **`app/binance_history_client.py`** — povijest cijena za proizvoljan Binance par i interval
-  (1d/4h/1h), izravno u `candle` tablicu (source_id='binance') - isti oblik kao izvorni podaci, pa
-  odmah radi sa svim postojećim strategijama/backtestom/optimizatorom.
+  (1d/4h/1h) preko REST API-ja, izravno u `candle` tablicu (source_id='binance') - isti oblik kao
+  izvorni podaci. Geografski blokiran iz OVOG razvojnog okruženja (HTTP 451) - vidi
+  `app/binance_vision_client.py` za trenutno korišten izvor.
+- **`app/binance_vision_client.py`** — statična bulk arhiva povijesnih svijeća
+  (data.binance.vision, monthly/daily ZIP+CSV) - NIJE geografski blokirana, koristi se za punu
+  XRP povijest i pravu 1h/4h povijest za ML trening. Vidi "Četvrta runda" iznad.
 - **`app/signals.py`** — trenutni (uživo) signal kupi/prodaj po dva horizonta, koristi iste
   `decide()` funkcije kao backtest, pozvane jednom na zadnju svijeću umjesto u petlji. Vidi
   "Signali kupi/prodaj" iznad.

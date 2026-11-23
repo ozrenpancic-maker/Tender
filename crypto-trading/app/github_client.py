@@ -3,8 +3,12 @@ marketing raste, a GitHub miruje, potencijalni problem" (iz korisnikovog popisa)
 REST API: bez ključa 60 zahtjeva/sat po IP-u, s besplatnim Personal Access Tokenom (classic, bez
 posebnih dopuštenja - samo za čitanje javnih repozitorija) 5000/sat.
 
-NAPOMENA O POUZDANOSTI: endpoint prema službenoj GitHub REST API dokumentaciji, nije uživo testiran
-u ovom okruženju (nema izlaznog pristupa internetu).
+UŽIVO TESTIRANO (23.11.2026., okruženje s izlaznim internet pristupom): HTTP 403, ali NE GitHubov
+stvarni rate limit - poruka je specifična za OVO razvojno sandbox okruženje ("GitHub access to
+this repository is not enabled for this session"), koje izravne REST pozive prema api.github.com
+preusmjerava/blokira i traži korištenje vlastitog GitHub MCP alata umjesto raw API poziva. Na
+korisnikovom običnom računalu (ili bilo gdje izvan ovog specifičnog sandboxa) ovaj klijent bi
+trebao raditi normalno prema stvarnim GitHub rate limitima (60/sat bez tokena, 5000/sat s njim).
 """
 import calendar
 import time

@@ -3,9 +3,8 @@ tokenomics podatke. Market cap i cijena zajedno implicitno daju cirkulirajuću p
 (market_cap / price) - CoinGecko ne nudi direktno POVIJESNU seriju cirkulirajuće ponude kao
 poseban endpoint, pa se izvodi na ovaj način.
 
-NAPOMENA O POUZDANOSTI: endpoint prema službenoj CoinGecko dokumentaciji (coingecko.com/en/api),
-nije uživo testiran u ovom okruženju (nema izlaznog pristupa internetu). Besplatni tier ima strog
-rate limit (cca 10-30 poziva/min) - sync treba pokretati rijetko, ne u petlji.
+UŽIVO TESTIRANO (23.11.2026.) - radi. Besplatni tier ima strog rate limit (cca 10-30 poziva/min) -
+sync treba pokretati rijetko, ne u petlji.
 """
 import time
 

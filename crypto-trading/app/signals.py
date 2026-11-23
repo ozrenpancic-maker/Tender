@@ -18,10 +18,18 @@ VAŽNO - poštena slika onoga što ovo jest:
   4 para kroz puni ciklus 2022-2026, vidi README "Pretraga po više parova"), ali i dalje nije
   testiran na XRP/SUI/PEPE/DOGE/POL/NEAR/ALGO specifično.
 - Oba su mehanički signali, ne preporuke financijskog savjetnika. Mogu biti u krivu.
-"""
-from app import binance_history_client
+
+ŽIVI DOHVAT PREKO COINBASE-A, NE BINANCEA (23.11.2026., nakon što je okruženju dopušten izlazni
+internet pristup): Binance REST API je geografski blokiran iz ovog okruženja (HTTP 451), Coinbase
+nije - i svih 7 korisnikovih portfolio coinova (XRP, SUI, PEPE, DOGE, POL, NEAR, ALGO) su uživo
+potvrđeni dostupni na Coinbaseu (XRP-USD, SUI-USD, itd.). Coinbase nema izravnu 4h granulaciju -
+za "4h" preset dohvate se 1h svijeće i agregiraju (resample_candles)."""
+from app import coinbase_client
+from app.candles import resample_candles
 from app.strategies import GENERIC_STRATEGIES
 from app.strategies.base import StrategyContext
+
+_GRANULARITY = {"4h": 3600, "1d": 86400}  # "4h" dohvaća 1h i resampla - Coinbase nema izravnu 4h
 
 PRESETS = {
     "short": {
@@ -54,12 +62,22 @@ class SignalError(Exception):
     pass
 
 
+def _fetch_coinbase(pair: str, interval: str, days: int) -> list:
+    base = pair.split("/")[0]
+    product_id = f"{base}-USD"
+    lookback_seconds = days * 86400
+    if interval == "4h":
+        hourly = coinbase_client.get_public_candles_paginated(product_id, 3600, lookback_seconds)
+        return resample_candles(hourly, 60, 240)
+    return coinbase_client.get_public_candles_paginated(product_id, _GRANULARITY[interval], lookback_seconds)
+
+
 def compute_signal(pair: str, horizon: str) -> dict:
     if horizon not in PRESETS:
         raise SignalError(f"Nepoznat horizont '{horizon}'. Dostupno: {list(PRESETS)}")
     preset = PRESETS[horizon]
 
-    candles = binance_history_client.fetch_recent(pair, days=preset["lookback_days"], interval=preset["interval"])
+    candles = _fetch_coinbase(pair, preset["interval"], preset["lookback_days"])
     if len(candles) < preset["min_candles"]:
         raise SignalError(
             f"Nedovoljno svijeća za {pair} ({len(candles)}, treba barem {preset['min_candles']}) - "

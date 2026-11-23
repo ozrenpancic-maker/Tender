@@ -16,7 +16,8 @@ from pathlib import Path
 
 import joblib
 
-from app import binance_history_client
+from app import coinbase_client
+from app.candles import resample_candles
 from app.ml.calibration import CLASSES
 from app.ml.dataset import HORIZONS
 from app.ml.features import FEATURE_NAMES, compute_feature_frame
@@ -192,10 +193,8 @@ def compute_prediction(pair: str, horizon: str) -> dict:
     # ne o horizontu. Prijašnja formula (interval_min // 60) je za 4h/24h/7d davala premalo dana
     # (npr. 30 dana na 1d intervalu = samo 30 svijeća) i trajno blokirala te horizonte čak i nakon
     # uspješne validacije - otkriveno u ChatGPT-ovoj neovisnoj reviziji.
-    min_candles = 230
-    days_needed = max(30, -(-(min_candles * spec["interval_min"]) // 1440) + 10)  # ceil + 10 dana zaliha
     try:
-        candles = binance_history_client.fetch_recent(pair, days=days_needed, interval=_binance_interval(horizon))
+        candles = _fetch_live_candles(pair, horizon)
     except Exception as err:
         return {**base, "decision": "NEMA DOVOLJNO POUZDANIH PODATAKA", "ai_score": None, "error": str(err)}
 
@@ -263,8 +262,34 @@ def compute_prediction(pair: str, horizon: str) -> dict:
     }
 
 
-def _binance_interval(horizon: str) -> str:
-    return {"1h": "1h", "4h": "4h", "24h": "1d", "7d": "1d"}[horizon]
+def _to_coinbase_product(pair: str) -> str:
+    """'BTC/USDT' -> 'BTC-USD'. Binance (gdje je treniran model) i Coinbase (odakle se uživo
+    dohvaća) koriste različite quote valute za istu bazu - USDT i USD su stablecoin/fiat s
+    razlikom tipično ispod 0,1%, prihvatljiva aproksimacija JER su sve značajke u modelu omjeri/
+    postoci (RSI, EMA-udaljenost, itd.), ne apsolutna cijena - vidi app/ml/features.py."""
+    base = pair.split("/")[0]
+    return f"{base}-USD"
+
+
+def _fetch_live_candles(pair: str, horizon: str) -> list:
+    """Live podaci za inference dolaze s Coinbase-a (javni, read-only, bez ključa) - NE s
+    binance_history_client.py, jer je Binance REST API geografski blokiran iz ovog okruženja
+    (HTTP 451), dok trenirani model koristi Binance podatke za POVIJEST (app/binance_vision_client.py,
+    statična bulk arhiva, nije pod istim ograničenjem). Coinbase nema izravnu 4h granulaciju - za
+    "4h" se dohvate 1h svijeće i agregiraju (resample_candles), isto kao kod treniranja."""
+    spec = HORIZONS[horizon]
+    product_id = _to_coinbase_product(pair)
+    min_candles = 230 + 20  # +20 zalihe
+
+    if horizon == "4h":
+        # treba min_candles 4h-svijeća -> 4x toliko 1h svijeća za resample; premašuje Coinbaseov
+        # limit od ~300 po pozivu, pa koristi paginiranu verziju (više sekvencijalnih poziva).
+        lookback_seconds = min_candles * 240 * 60
+        hourly = coinbase_client.get_public_candles_paginated(product_id, 3600, lookback_seconds)
+        return resample_candles(hourly, 60, 240)
+    granularity = {"1h": 3600, "24h": 86400, "7d": 86400}[horizon]
+    lookback_seconds = min_candles * spec["interval_min"] * 60
+    return coinbase_client.get_public_candles(product_id, granularity, lookback_seconds)
 
 
 def compute_all(pairs: list[str]) -> dict:

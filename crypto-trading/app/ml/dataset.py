@@ -1,7 +1,11 @@
-"""Gradi skup podataka (značajke + labele) po horizontu, POOLED preko BTC/ETH/SOL (više podataka,
-jedan opći model po horizontu - ne po paru; vidi README zašto). Parovi se namjerno NE kodiraju kao
-značajka - model uči samo tehničke uzorke, ne "ovo je baš BTC", što je pretpostavka vrijedna
-provjere, ali razumna polazna točka s ograničenom poviješću koju imamo za SOL.
+"""Gradi skup podataka (značajke + labele) po horizontu, POOLED preko BTC/ETH/SOL/XRP (više
+podataka, jedan opći model po horizontu - ne po paru; vidi README zašto). Parovi se namjerno NE
+kodiraju kao značajka - model uči samo tehničke uzorke, ne "ovo je baš BTC", što je pretpostavka
+vrijedna provjere, ali razumna polazna točka.
+
+1h/4h povijest je OD 23.11.2026. STVARNA (3 godine, preko app/binance_vision_client.py), ne više
+resamplirana iz 113 dana 5-min podataka - vidi README "Treća runda" za detalje te promjene i
+njen učinak na walk-forward validaciju.
 
 Svaki primjer čuva i (pair, opened_at) da se walk-forward foldovi mogu posložiti STROGO kronološki
 preko cijelog pooled skupa - sprječava curenje gdje bi "buduća" svijeća jednog para završila u
@@ -11,12 +15,12 @@ from app.candles import load_candles, resample_candles
 from app.ml.features import FEATURE_NAMES, compute_feature_frame
 from app.ml.labels import label_series
 
-PAIRS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"]
+PAIRS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT"]
 
 # horizon -> (interval_min na kojem računamo značajke/label, source_interval_min ako treba resample, steps_ahead)
 HORIZONS = {
-    "1h": {"label": "1 sat", "interval_min": 60, "source_interval_min": 5, "steps_ahead": 1},
-    "4h": {"label": "4 sata", "interval_min": 240, "source_interval_min": 5, "steps_ahead": 1},
+    "1h": {"label": "1 sat", "interval_min": 60, "source_interval_min": 60, "steps_ahead": 1},
+    "4h": {"label": "4 sata", "interval_min": 240, "source_interval_min": 240, "steps_ahead": 1},
     "24h": {"label": "24 sata", "interval_min": 1440, "source_interval_min": 1440, "steps_ahead": 1},
     "7d": {"label": "7 dana", "interval_min": 1440, "source_interval_min": 1440, "steps_ahead": 7},
 }

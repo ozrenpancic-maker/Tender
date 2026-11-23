@@ -5,11 +5,8 @@ izvršava prave naloge i ne traži Coinbase trgovačke API ključeve niti pristu
 Autenticirani dio (JWT, stanje računa, slanje naloga) koji je ovdje prije postojao je UKLONJEN -
 vidi git povijest ove datoteke i `live_engine.py` ako ga treba za referencu.
 
-NAPOMENA O POUZDANOSTI: ovo razvojno okruženje nema izlazni pristup internetu, pa javni Coinbase
-pozivi nisu uživo testirani. Endpointi su napisani prema poznatoj javnoj dokumentaciji Coinbase
-Exchange API-ja u trenutku pisanja koda. Prije pravog korištenja pokreni "Testiraj vezu" na
-dashboardu iz okoline koja ima pristup internetu - ako javi grešku, popravak je izoliran ovdje.
-"""
+UŽIVO TESTIRANO (23.11.2026., okruženje s izlaznim internet pristupom) - radi, dobivena stvarna
+BTC-EUR cijena preko javnog cjenovnog feeda."""
 import time
 
 import httpx
@@ -39,17 +36,23 @@ def to_product_id(pair: str) -> str:
     return pair.replace("/", "-")
 
 
-def get_public_daily_candles(product_id: str, days: int = 120):
-    """Vraća zatvorene dnevne svijeće (zadnja, nedovršena svijeća za danas se izbacuje).
-    Koristi javni Coinbase Exchange 'candles' endpoint, format [time, low, high, open, close, volume]."""
+VALID_GRANULARITIES = {60, 300, 900, 3600, 21600, 86400}  # 1min/5min/15min/1h/6h/1d - Coinbase ne nudi 4h izravno
+
+
+def get_public_candles(product_id: str, granularity: int, lookback_seconds: int):
+    """Vraća zatvorene svijeće (zadnja, nedovršena svijeća se izbacuje) za zadanu granulaciju
+    (sekunde). Koristi javni Coinbase Exchange 'candles' endpoint, format
+    [time, low, high, open, close, volume]. Coinbase vraća max ~300 svijeća po pozivu."""
     from app.candles import Candle
 
+    if granularity not in VALID_GRANULARITIES:
+        raise CoinbaseError(f"Nepodržana granulacija {granularity}. Dostupno: {sorted(VALID_GRANULARITIES)}")
     now = int(time.time())
-    start = now - days * 86400
+    start = now - lookback_seconds
     with httpx.Client(timeout=15) as client:
         resp = client.get(
             f"{PUBLIC_BASE}/products/{product_id}/candles",
-            params={"granularity": 86400, "start": start, "end": now},
+            params={"granularity": granularity, "start": start, "end": now},
         )
     if resp.status_code != 200:
         raise CoinbaseError(f"HTTP {resp.status_code} od candles endpointa: {resp.text[:300]}")
@@ -62,10 +65,57 @@ def get_public_daily_candles(product_id: str, days: int = 120):
         for r in rows
     ]
     candles.sort(key=lambda c: c.opened_at)
-    # Izbaci posljednju svijeću ako dan još nije završio (izbjegava odluke na nedovršenim podacima).
-    if candles and candles[-1].opened_at + 86400 > now:
+    # Izbaci posljednju svijeću ako razdoblje još nije završilo (izbjegava odluke na nedovršenim podacima).
+    if candles and candles[-1].opened_at + granularity > now:
         candles = candles[:-1]
     return candles
+
+
+def get_public_candles_paginated(product_id: str, granularity: int, lookback_seconds: int):
+    """Isto kao get_public_candles, ali bez Coinbaseovog ograničenja od max ~300 svijeća po
+    pozivu - dijeli traženo razdoblje na više sekvencijalnih poziva unatrag kroz vrijeme."""
+    from app.candles import Candle
+
+    max_per_call = 290 * granularity  # malo ispod stvarnog limita (300), sigurnosna margina
+    now = int(time.time())
+    window_end = now
+    all_candles: list[Candle] = []
+    remaining = lookback_seconds
+    while remaining > 0:
+        window_seconds = min(remaining, max_per_call)
+        window_start = window_end - window_seconds
+        with httpx.Client(timeout=15) as client:
+            resp = client.get(
+                f"{PUBLIC_BASE}/products/{product_id}/candles",
+                params={"granularity": granularity, "start": window_start, "end": window_end},
+            )
+        if resp.status_code != 200:
+            raise CoinbaseError(f"HTTP {resp.status_code} od candles endpointa: {resp.text[:300]}")
+        rows = resp.json()
+        all_candles.extend(
+            Candle(opened_at=int(r[0]), low=float(r[1]), high=float(r[2]), open=float(r[3]), close=float(r[4]), volume=float(r[5]))
+            for r in rows
+        )
+        window_end = window_start
+        remaining -= window_seconds
+
+    all_candles.sort(key=lambda c: c.opened_at)
+    # ukloni duplikate na granicama prozora, izbaci nedovršenu zadnju svijeću
+    deduped = []
+    seen = set()
+    for c in all_candles:
+        if c.opened_at not in seen:
+            seen.add(c.opened_at)
+            deduped.append(c)
+    if deduped and deduped[-1].opened_at + granularity > now:
+        deduped = deduped[:-1]
+    return deduped
+
+
+def get_public_daily_candles(product_id: str, days: int = 120):
+    """Zadržano za postojeće pozivatelje (paper_engine.py) - isto što i get_public_candles s
+    granularity=86400."""
+    return get_public_candles(product_id, 86400, days * 86400)
 
 
 def test_connection() -> dict:

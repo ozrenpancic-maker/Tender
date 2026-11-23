@@ -2,9 +2,7 @@
 Koristi se kao fundamentalni "korištenje mreže" signal za altcoine (rast TVL-a = više kapitala
 zaključano u DeFi na toj mreži).
 
-NAPOMENA O POUZDANOSTI: endpoint prema službenoj DeFiLlama dokumentaciji (defillama.com/docs/api),
-nije uživo testiran u ovom okruženju (nema izlaznog pristupa internetu).
-"""
+UŽIVO TESTIRANO (23.11.2026., nakon što je okruženju dopušten izlazni internet pristup) - radi."""
 import time
 
 import httpx

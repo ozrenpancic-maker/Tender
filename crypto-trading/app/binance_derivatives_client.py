@@ -7,6 +7,12 @@ Open interest povijest (`/futures/data/openInterestHist`) je ograničena na zadn
 strane Binancea - korisno za paper/live, ali nedovoljno za dugi backtest, pa nije uključeno u
 `needs_series` mehanizam (koji pretpostavlja dovoljno povijesti za in-sample/out-of-sample testove).
 
+UŽIVO TESTIRANO (23.11.2026., okruženje s izlaznim internet pristupom): HTTP 451 - "Service
+unavailable from a restricted location" po Binanceovim Uvjetima korištenja. Ovo NIJE problem s
+internet pristupom ni s kodom - Binance (fapi.binance.com i api.binance.com) geografski blokira
+ovu konkretnu lokaciju/IP raspon, neovisno o tome ima li okruženje internet. `data.binance.vision`
+(statična bulk arhiva, vidi `app/binance_vision_client.py`) NIJE pod istim ograničenjem i radi.
+
 NAPOMENA O POUZDANOSTI: endpointi prema javnoj Binance Futures API dokumentaciji, nisu uživo
 testirani u ovom okruženju (nema izlaznog pristupa internetu).
 """
