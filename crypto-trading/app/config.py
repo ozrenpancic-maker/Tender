@@ -12,6 +12,13 @@ DB_PATH = Path(os.environ.get("CRYPTO_DB_PATH", ROOT / "data" / "kripto.sqlite")
 
 PAPER_STARTING_BALANCE_EUR = float(os.environ.get("PAPER_STARTING_BALANCE_EUR", "500"))
 
+# Opcionalni API ključ za dashboard (nađeno u ChatGPT-ovoj neovisnoj reviziji: API nije imao NIKAKVU
+# autentikaciju - u redu za localhost, rizično ako server postane dostupan izvan vlastitog računala
+# npr. port forwarding). Ako je postavljen, svi /api/* pozivi moraju slati
+# "Authorization: Bearer <ključ>" header. Ako NIJE postavljen (default), ponašanje je nepromijenjeno
+# - i dalje misliš da je ovo za kućnu/uredsku WiFi mrežu, ne javni internet (vidi README).
+DASHBOARD_API_KEY = os.environ.get("DASHBOARD_API_KEY", "")
+
 # FRED (Federal Reserve Economic Data) - besplatan ključ: fred.stlouisfed.org/docs/api/api_key.html
 FRED_API_KEY = os.environ.get("FRED_API_KEY", "")
 

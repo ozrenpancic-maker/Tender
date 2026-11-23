@@ -11,12 +11,38 @@ const STRATEGY_COLORS = {
   derivatives_extremes: "#15803d",
 };
 
-async function api(path, options) {
-  const res = await fetch(path, options);
+function getApiKey() {
+  try {
+    return localStorage.getItem("dashboardApiKey") || "";
+  } catch {
+    return "";
+  }
+}
+
+async function api(path, options = {}) {
+  const key = getApiKey();
+  const headers = { ...(options.headers || {}) };
+  if (key) headers["Authorization"] = `Bearer ${key}`;
+  const res = await fetch(path, { ...options, headers });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    document.getElementById("apiKeySection").style.display = "block";
+  }
   if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
   return data;
 }
+
+document.getElementById("apiKeyInput").value = getApiKey();
+document.getElementById("apiKeySave").addEventListener("click", () => {
+  const value = document.getElementById("apiKeyInput").value.trim();
+  try {
+    if (value) localStorage.setItem("dashboardApiKey", value);
+    else localStorage.removeItem("dashboardApiKey");
+  } catch {
+    // localStorage nedostupan (npr. privatni način) - ključ se neće pamtiti između posjeta.
+  }
+  location.reload();
+});
 
 function fmtEur(n) {
   return `${Number(n).toLocaleString("hr-HR", { maximumFractionDigits: 2 })} €`;

@@ -25,6 +25,18 @@
     <div id="liveBanner" class="banner ok">✓ Isključivo savjetnik/simulator - nema koda koji šalje prave naloge niti traži Coinbase trgovačke API ključeve.</div>
   </section>
 
+  <section id="apiKeySection" style="display:none">
+    <h2>0. API ključ (samo ako je DASHBOARD_API_KEY postavljen u .env)</h2>
+    <p class="muted">
+      Server zahtijeva API ključ za sve pozive. Upiši ga ovdje jednom - pamti se samo u tvom
+      pregledniku (localStorage), ne šalje se nikamo osim ovom serveru.
+    </p>
+    <div class="row">
+      <input id="apiKeyInput" type="password" placeholder="API ključ" />
+      <button id="apiKeySave">Spremi</button>
+    </div>
+  </section>
+
   <section>
     <h2>1. AI Prediction Engine (ML, kalibrirane vjerojatnosti)</h2>
     <p class="muted">

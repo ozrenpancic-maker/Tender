@@ -63,15 +63,24 @@ def check_no_lookahead(candles: list[Candle]) -> None:
 
 def check_fee_arithmetic() -> None:
     """Konstantna cijena, jedna kupnja i jedna prodaja: naknade+slippage mogu SAMO smanjiti kapital,
-    nikad ga povećati ili ostaviti netaknutim."""
+    nikad ga povećati ili ostaviti netaknutim.
+
+    VAŽNO (nađeno u ChatGPT-ovoj neovisnoj reviziji): prva verzija ovog testa koristila je samo
+    `buy_fill_price`/`sell_fill_price` (SLIPPAGE), bez FEE - test bi prošao i kad bi stvarna
+    naknada u `run_generic_backtest` imala grešku, jer je provjeravao samo pola troškovnog modela.
+    Formula ispod sada vjerno ponavlja ONO ŠTO SIMULACIJA STVARNO RADI
+    (`app/backtest.py:run_generic_backtest` - `cash*(1-FEE)/buy_fill` pri kupnji,
+    `position*sell_fill*(1-FEE)` pri prodaji), ne samo costs.py helper funkcije izolirano."""
     price = 100.0
     start_cash = 100.0
-    qty = start_cash / buy_fill_price(price)
-    end_cash = qty * sell_fill_price(price)
-    expected = start_cash * (1 - SLIPPAGE) / (1 + SLIPPAGE)
-    assert abs(end_cash - expected) < 1e-9, "Fee/slippage matematika ne odgovara formuli."
+    position_base = (start_cash * (1 - FEE)) / buy_fill_price(price)
+    end_cash = position_base * sell_fill_price(price) * (1 - FEE)
+    expected = start_cash * (1 - FEE) / (1 + SLIPPAGE) * (1 - SLIPPAGE) * (1 - FEE)
+    assert abs(end_cash - expected) < 1e-9, "Fee/slippage matematika ne odgovara formuli iz backtest.py."
     assert end_cash < start_cash, "Round-trip uz naknade/slippage ne smije povećati kapital na konstantnoj cijeni."
-    print(f"PASS check_fee_arithmetic: {start_cash} -> {end_cash:.4f} na konstantnoj cijeni (FEE={FEE}, SLIPPAGE={SLIPPAGE}).")
+    only_slippage = start_cash * (1 - SLIPPAGE) / (1 + SLIPPAGE)
+    assert end_cash < only_slippage, "Stvarni trošak mora biti veći (kapital manji) nego da FEE ne postoji."
+    print(f"PASS check_fee_arithmetic: {start_cash} -> {end_cash:.4f} na konstantnoj cijeni (FEE={FEE}, SLIPPAGE={SLIPPAGE}), potvrđeno veći trošak nego samo-slippage ({only_slippage:.4f}).")
 
 
 def check_ohlc_integrity(pair: str, candles: list[Candle]) -> None:

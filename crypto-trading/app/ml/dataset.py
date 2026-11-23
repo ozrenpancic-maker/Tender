@@ -61,12 +61,18 @@ def build_examples(conn, horizon_key: str) -> list[dict]:
     return examples
 
 
-def walk_forward_folds(examples: list[dict], n_folds: int = 5, min_train: int = 300):
+def walk_forward_folds(examples: list[dict], n_folds: int = 5, min_train: int = 300, purge_seconds: int = 0):
     """Generira (train_fit, calibrate, test) triple-ove, kronološki, expanding-window:
     - podijeli `examples` (već sortirano po vremenu) u `n_folds` jednakih kronoloških blokova,
     - za svaki fold k=1..n_folds-1: train = blokovi[0..k-1] (zadnjih 20% toga je `calibrate`,
       ostatak je `train_fit`), test = blok k (NIKAD korišten za fit/kalibraciju).
-    Smanjuje n_folds ako nema dovoljno podataka za `min_train` primjera u prvom treningu."""
+    Smanjuje n_folds ako nema dovoljno podataka za `min_train` primjera u prvom treningu.
+
+    `purge_seconds` (otkriveno u ChatGPT-ovoj neovisnoj reviziji): label na indeksu i koristi
+    cijenu na i+steps_ahead - bez čišćenja, zadnjih nekoliko primjera u kalibracijskom skupu imali
+    bi label koji "gleda" u cijene koje pripadaju test bloku, blago kontaminirajući kalibraciju
+    stvarnim ishodom testnog razdoblja. Čisti se REP (ne cijeli train_all) tako da se izbace svi
+    primjeri čiji label-prozor (opened_at + purge_seconds) seže u test blok ili dalje."""
     n = len(examples)
     if n < min_train * 2:
         return []
@@ -79,6 +85,10 @@ def walk_forward_folds(examples: list[dict], n_folds: int = 5, min_train: int = 
     folds = []
     for k in range(1, n_folds):
         train_all = [e for block in blocks[:k] for e in block]
+        test_block = blocks[k]
+        if purge_seconds and test_block:
+            cutoff = test_block[0]["opened_at"] - purge_seconds
+            train_all = [e for e in train_all if e["opened_at"] <= cutoff]
         if len(train_all) < min_train:
             continue
         split = int(len(train_all) * 0.8)

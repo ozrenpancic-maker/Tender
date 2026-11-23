@@ -100,10 +100,19 @@ def _to_candles(rows: list[list]) -> list[Candle]:
 
 
 def fetch_recent(pair: str, days: int = 400, interval: str = "1d") -> list[Candle]:
+    """Vraća samo ZATVORENE svijeće - ako je zadnja još u tijeku (Binance klines endpoint je ne
+    isključuje automatski), izbacuje se. Bitno za uživo AI predikciju: model je treniran na
+    zatvorenim svijećama, pa bi nedovršena posljednja svijeća (OHLCV se još mijenja) unijela
+    razmak između treninga i uživo ulaza - nađeno u ChatGPT-ovoj neovisnoj reviziji."""
     symbol = _symbol_for(pair)
     since_ms = int((time.time() - days * 86400) * 1000)
     rows = _fetch_all_klines(symbol, interval, since_ms)
-    return _to_candles(rows)
+    candles = _to_candles(rows)
+    interval_ms, _ = INTERVALS[interval]
+    now = time.time()
+    if candles and candles[-1].opened_at + interval_ms / 1000 > now:
+        candles = candles[:-1]
+    return candles
 
 
 def sync_to_db(conn, pair: str, since: str = "2017-01-01", interval: str = "1d") -> int:

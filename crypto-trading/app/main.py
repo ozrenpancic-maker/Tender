@@ -2,11 +2,12 @@ import datetime
 import json
 import time
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app import binance_history_client, coinbase_client, db, equity_client, paper_engine
+from app import binance_history_client, coinbase_client, config, db, equity_client, paper_engine
 from app.backtest import run_backtest
 from app.candles import available_pairs
 from app.macro_clients import MACRO_CLIENTS, all_labels, test_all_connections
@@ -17,6 +18,19 @@ from app.signals import PRESETS as SIGNAL_PRESETS, compute_all as compute_all_si
 from app.strategies import GENERIC_STRATEGIES
 
 app = FastAPI(title="Kripto trgovanje - istraživački MVP")
+
+
+@app.middleware("http")
+async def require_api_key(request: Request, call_next):
+    """Opcionalna autentikacija (vidi config.DASHBOARD_API_KEY) - ako ključ nije postavljen u .env,
+    ponašanje je nepromijenjeno (nema provjere). Ako je postavljen, svi /api/* pozivi moraju imati
+    'Authorization: Bearer <ključ>'. Statika (dashboard HTML/JS) ostaje dostupna bez ključa da bi se
+    stranica mogla učitati - dashboard.js sam prilaže ključ iz localStorage na svoje API pozive."""
+    if config.DASHBOARD_API_KEY and request.url.path.startswith("/api/"):
+        header = request.headers.get("authorization", "")
+        if header != f"Bearer {config.DASHBOARD_API_KEY}":
+            return JSONResponse(status_code=401, content={"detail": "Nedostaje ili je neispravan API ključ."})
+    return await call_next(request)
 
 
 @app.on_event("startup")

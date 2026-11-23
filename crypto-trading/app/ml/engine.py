@@ -152,8 +152,14 @@ def compute_prediction(pair: str, horizon: str) -> dict:
             "data_quality": {"ok": False, "note": "Model nije validiran - vidi reasons_against."},
         }
 
+    # Treba barem ~210 svijeća (EMA200 zagrijavanje) NA OVOM INTERVALU - "dana" ovisi o intervalu,
+    # ne o horizontu. Prijašnja formula (interval_min // 60) je za 4h/24h/7d davala premalo dana
+    # (npr. 30 dana na 1d intervalu = samo 30 svijeća) i trajno blokirala te horizonte čak i nakon
+    # uspješne validacije - otkriveno u ChatGPT-ovoj neovisnoj reviziji.
+    min_candles = 230
+    days_needed = max(30, -(-(min_candles * spec["interval_min"]) // 1440) + 10)  # ceil + 10 dana zaliha
     try:
-        candles = binance_history_client.fetch_recent(pair, days=max(30, spec["interval_min"] // 60), interval=_binance_interval(horizon))
+        candles = binance_history_client.fetch_recent(pair, days=days_needed, interval=_binance_interval(horizon))
     except Exception as err:
         return {**base, "decision": "NEMA DOVOLJNO POUZDANIH PODATAKA", "ai_score": None, "error": str(err)}
 
@@ -169,6 +175,19 @@ def compute_prediction(pair: str, horizon: str) -> dict:
     last = feature_rows[-1]
     if any(last[name] is None for name in FEATURE_NAMES):
         return {**base, "decision": "NEMA DOVOLJNO POUZDANIH PODATAKA", "ai_score": None, "reasons_against": ["Nedostaju neke značajke na zadnjoj svijeći."]}
+
+    # ChatGPT-ova neovisna revizija: kvaliteta podataka se računala i vraćala, ali NIJE blokirala
+    # BUY/SELL kad je zadnja svijeća zastarjela - popravljeno, zastarjeli podaci sada prisilno
+    # vraćaju WAIT umjesto moguće krive preporuke na staroj cijeni.
+    quality = _data_quality(candles, horizon)
+    if not quality["ok"]:
+        return {
+            **base,
+            "decision": "NEMA DOVOLJNO POUZDANIH PODATAKA",
+            "ai_score": None,
+            "reasons_against": [f"Podaci zastarjeli: {quality['note']}"],
+            "data_quality": quality,
+        }
 
     model = _load_model(horizon)
     X = [[last[name] for name in FEATURE_NAMES]]

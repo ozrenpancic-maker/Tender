@@ -334,6 +334,65 @@ samo pregledano). Vrijedno je zapisati rezultat te usporedbe:
   (uključujući pad njegovog stvarnog portfelja), pa postoji blagi rizik data-snoopinga i za ovaj
   projekt i za ChatGPT-ov. Vrijedi uzeti u obzir pri tumačenju "pobjeđuje kupi-i-drži" nalaza.
 
+### Druga runda revizije (KriptoMVP 5.2) - pet pravih bugova, svi popravljeni
+
+ChatGPT je napravio drugu, dublju neovisnu reviziju ("REVIZIJA_KriptoMVP_5_2.md") nad ovim kodom (ne
+samo usporedbu rezultata) i pronašao pet konkretnih bugova, svi popravljeni u ovom repozitoriju:
+
+1. **(Kritično) Uživo AI dohvat premalo povijesti** (`app/ml/engine.py`): formula
+   `days=max(30, interval_min // 60)` za 24h/7d horizont dohvaćala je samo 30 dnevnih svijeća, a
+   validacija zahtijeva barem 210 - ta tri horizonta bi ostala zauvijek blokirana (WAIT) čak i
+   nakon uspješne validacije modela. Popravljeno: dohvaća se dovoljno dana za barem 230 ZATVORENIH
+   svijeća na odgovarajućem intervalu, uz 10 dana rezerve.
+2. **(Kritično) ML curenje oznaka preko granice test bloka** (`app/ml/dataset.py`): label na
+   trenutku t koristi cijenu na t+horizont. Bez čišćenja, zadnji primjeri u kalibracijskom skupu
+   imali su label čiji je ishod zapravo bio POZNAT tek nakon početka test bloka - blaga
+   kontaminacija. Popravljeno dodavanjem `purge_seconds` parametra koji izbacuje iz treninga/
+   kalibracije svaki primjer čiji label-prozor seže u ili preko početka test bloka. Nakon popravka:
+   walk-forward Brier rezultati ostali su gotovo identični (0,52605 vs 0,52504 na 24h, 0,56738 vs
+   0,55622 na 7d) - curenje je postojalo, ali nije promijenilo zaključak. **Cross-validacija**:
+   ChatGPT-ova neovisna implementacija istog popravka dala je 0,52579/0,52504 (24h) i 0,56753/
+   0,55622 (7d) - baseline Brier identičan do 5 decimala, LightGBM Brier razlika <0,0002.
+3. **(Kritično) Nedovršena posljednja svijeća u uživo dohvatu** (`app/binance_history_client.py`):
+   `fetch_recent` nije izbacivao svijeću koja je još "u tijeku" - model je treniran na ZATVORENIM
+   svijećama, pa bi djelomična posljednja svijeća (volumen/close se još mijenjaju) unijela razmak
+   između treninga i uživo ulaza. Popravljeno.
+4. **(Visok) Provjera naknada testirala samo slippage** (`app/checks.py`): `check_fee_arithmetic`
+   je koristio samo `buy_fill_price`/`sell_fill_price` (SLIPPAGE), ne i FEE - test bi prošao i da
+   je stvarna naknada u `run_generic_backtest` imala grešku. Popravljeno da vjerno prati STVARNU
+   formulu iz backtesta. **Cross-validacija**: ispravan rezultat na 100 USDT, konstantna cijena,
+   jedna kupnja+prodaja = **99,0034** - identično ChatGPT-ovom neovisnom izračunu, do 4 decimale.
+5. **(Visok) Zastarjeli podaci nisu blokirali BUY/SELL** (`app/ml/engine.py`): kvaliteta podataka
+   se računala i vraćala u odgovoru, ali decision/AI Score su se i dalje računali i prikazivali čak
+   i kad je zadnja svijeća bila zastarjela. Popravljeno - zastarjeli podaci sada prisilno vraćaju
+   "NEMA DOVOLJNO POUZDANIH PODATAKA" umjesto moguće krive preporuke na staroj cijeni.
+
+Dodatno je pronađen i stvaran sigurnosni propust koji je **već prije ove revizije bio poznat i
+opisan** u ovom README-u (vidi "Ograničenja koja treba znati"), a sada je i popravljen: dashboard
+API nije imao NIKAKVU autentikaciju. Dodan je opcionalni `DASHBOARD_API_KEY` (vidi `.env.example`)
+- ako je postavljen, svi `/api/*` pozivi moraju imati `Authorization: Bearer <ključ>`; ako nije
+postavljen (default), ponašanje je nepromijenjeno. Dashboard ima jednostavno polje za unos ključa
+(pamti se u localStorage preglednika).
+
+**Ono što ChatGPT-ova revizija ispravno navodi kao JOŠ NERIJEŠENO (nije popravljeno u ovom krugu,
+namjerno odgođeno - veći zahvati, manji prioritet s obzirom da svi AI modeli trenutno ipak vraćaju
+WAIT za sve horizonte)**:
+- Point-in-time dostupnost makro podataka (`macro_series` nema `published_at`/`available_at`,
+  samo `observed_date` - teoretski bi strategija mogla "znati" vrijednost prije nego je stvarno
+  objavljena, ovisno o izvoru).
+- Usporediv završni obračun likvidacije kad backtest završi s otvorenom pozicijom (i buy&hold i
+  aktivne strategije trenutno izvještavaju mark-to-market bez završnog izlaznog troška - dosljedno
+  između njih, ali blago naduvava apsolutne brojeve ako se tumače kao "gotovina da danas prodam").
+- Realne Coinbase EUR naknade/spread/minimalna veličina naloga kao zaseban scenarij (trenutno fiksno
+  0,4%+0,1% za sve).
+- `reasons_for`/`reasons_against` u `app/ml/engine.py` su heuristička interpretacija vrijednosti
+  značajki, NE stvarni doprinosi koje je LightGBM model koristio (trebao bi SHAP ili slično za tu
+  tvrdnju - vidi "AI Prediction Engine" iznad, već je ranije označeno kao mogući fazni 6 dodatak).
+- 1h/4h pokrivenost (~113 dana) je i dalje premala za procjenu kroz različite tržišne režime.
+- XRP puna povijest i dalje nedostaje u ovoj bazi.
+- Mrežni pozivi i Android APK nisu testirani u ovom okruženju (nema interneta) - samo statička
+  provjera koda.
+
 ## Arhitektura
 
 - **`data/kripto.sqlite`** — povijesne dnevne/5-min svijeće (Binance, Coin Metrics, uzorci

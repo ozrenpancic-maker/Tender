@@ -77,8 +77,8 @@ def _probs_in_class_order(model, X) -> list[list[float]]:
     return out
 
 
-def run_walk_forward(examples: list[dict], fit_fn) -> dict | None:
-    folds = walk_forward_folds(examples)
+def run_walk_forward(examples: list[dict], fit_fn, purge_seconds: int = 0) -> dict | None:
+    folds = walk_forward_folds(examples, purge_seconds=purge_seconds)
     if not folds:
         return None
     all_true: list[str] = []
@@ -113,8 +113,9 @@ def train_horizon(conn, horizon_key: str) -> dict:
         "classes": CLASSES,
     }
 
-    lgbm_wf = run_walk_forward(examples, _fit_lgbm)
-    logreg_wf = run_walk_forward(examples, _fit_logreg)
+    purge_seconds = spec["steps_ahead"] * spec["interval_min"] * 60
+    lgbm_wf = run_walk_forward(examples, _fit_lgbm, purge_seconds)
+    logreg_wf = run_walk_forward(examples, _fit_logreg, purge_seconds)
     result["lightgbm_walk_forward"] = lgbm_wf
     result["logreg_walk_forward"] = logreg_wf
 
