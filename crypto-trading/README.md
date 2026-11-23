@@ -183,6 +183,35 @@ uvicorn app.main:app --reload --port 8010
 
 Otvori [http://localhost:8010](http://localhost:8010).
 
+## Android (instalacija na telefon preko lokalne mreže)
+
+Dashboard je postavljen kao PWA (manifest + ikone + service worker, vidi `static/manifest.json` i
+`static/sw.js`) pa ga je moguće instalirati na Android telefon kao app - bez Play Storea, bez
+Android Studija. Backend i dalje mora raditi na računalu; telefon mu pristupa preko WiFi-ja.
+
+1. Pokreni server tako da sluša na cijeloj mreži, ne samo na računalu:
+   ```bash
+   uvicorn app.main:app --host 0.0.0.0 --port 8010
+   ```
+   Ovo čini server dostupnim svima na istoj WiFi mreži bez autentikacije - u redu za kućnu/uredsku
+   mrežu, ne ostavljaj ovako pokrenuto na javnoj/nepouzdanoj mreži.
+2. Pronađi lokalnu IP adresu računala:
+   - Windows: `ipconfig` u CMD-u, traži "IPv4 Address" (npr. `192.168.1.50`)
+   - Mac/Linux: `ifconfig` ili `ip addr`
+3. Na telefonu (ista WiFi mreža) otvori Chrome i idi na `http://<IP-adresa-računala>:8010`
+   (npr. `http://192.168.1.50:8010`).
+4. Chrome izbornik (tri točke gore desno) → **"Dodaj na početni zaslon"** (Add to Home screen).
+   Dobiješ ikonu na telefonu koja otvara dashboard u punom zaslonu, bez adresne trake preglednika.
+
+**Važno ograničenje**: ovo je obično HTTP, ne HTTPS. Service worker (koji bi omogućio pravu
+"instaliraj aplikaciju" ponudu i keširanje) treba HTTPS da bi radio - preglednici ne dopuštaju
+service workere na nesigurnim izvorima osim `localhost`. Ručno "Dodaj na početni zaslon" iz
+izbornika i dalje radi preko običnog HTTP-a i daje ti ikonu + prozor bez adresne trake, što za
+ovaj slučaj (živi podaci, ne treba offline keširanje) sasvim pokriva potrebu. Ako jednom poželiš
+pravu instalabilnost (auto-prompt, offline shell), trebao bi server staviti iza HTTPS-a
+(samopotpisani certifikat + ručno povjerenje na telefonu, ili reverse proxy s pravim certifikatom)
+- javi ako to želiš pa se dogradi.
+
 ## Kako je provjereno
 
 Backtest engine je testiran tako da `baseline_2pct` na BTC/EUR, 2024-01-01 do 2026-11-21, daje
