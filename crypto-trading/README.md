@@ -306,7 +306,7 @@ samo pregledano). Vrijedno je zapisati rezultat te usporedbe:
   otvaranju, identičan trošak (0,4% naknada + 0,1% slippage po strani), razvoj parametara samo na
   2021-2024, provjera na 2025-2026 bez ponovnog podešavanja. ChatGPT-ov paket ima i automatski test
   za look-ahead bias (promijeni buduće podatke, provjeri da se prošli signal ne mijenja) - dobra
-  praksa koju bi i ovaj projekt trebao imati.
+  praksa koja je prevedena i u ovaj projekt, vidi `app/checks.py` ispod.
 - **Portirane su nove strategije** (`app/strategies/trend_guard.py`, `ema_trend.py`,
   `confirmed_trend.py`, `donchian_breakout.py`, `dual_momentum.py`, `vol_guarded_trend.py`) iz
   njihovog koda, prevedene u ovog projekta `decide(ctx)` oblik. **Cross-validacija**: `trend_guard`
@@ -343,6 +343,11 @@ samo pregledano). Vrijedno je zapisati rezultat te usporedbe:
 - **`app/backtest.py`** + **`app/strategies/`** — generički dnevni backtest engine (odluka nakon
   zatvaranja dana, izvršenje na idućem otvaranju) i strategije. Svaka strategija je čista funkcija
   `(context) -> "buy"/"sell"/"hold"`, pa se identičan kod koristi i za backtest i za paper/live.
+- **`app/checks.py`** — integritetski testovi (ne profitabilnost): look-ahead bias (mijenja buduću
+  svijeću, provjerava da se prošla odluka ne mijenja, za SVE registrirane strategije), aritmetika
+  naknada/slippagea, OHLC integritet podataka (duplikati, nemogući odnosi). Pokreni
+  `python3 -m app.checks` nakon svake nove/izmijenjene strategije. Vidi "Nezavisna provjera s
+  ChatGPT-ovim paralelnim istraživanjem" iznad.
 - **`app/coinbase_client.py`** — ISKLJUČIVO javni cjenovni feed (bez ključa). Autenticirani dio je
   uklonjen (KriptoMVP 4.4 pravila) - vidi "Isključivo savjetnik/simulator" ispod.
 - **`app/ml/`** — AI Prediction Engine (faza 3): `features.py` (značajke), `labels.py` (3-klasni
