@@ -1,12 +1,18 @@
 from app.strategies import (
+    confirmed_trend,
     derivatives_extremes,
     dip_buy_volume,
+    donchian_breakout,
+    dual_momentum,
+    ema_trend,
     equity_filtered,
     macro_signal_composite,
     multi_macro_filter,
     rsi_meanrev,
     sma_crossover,
     technical_composite,
+    trend_guard,
+    vol_guarded_trend,
 )
 
 GENERIC_STRATEGIES = {
@@ -48,4 +54,10 @@ GENERIC_STRATEGIES = {
         "needs_aux": [],
         "needs_series": derivatives_extremes.NEEDS_SERIES,
     },
+    "trend_guard": {"label": trend_guard.LABEL, "default_params": trend_guard.DEFAULT_PARAMS, "decide": trend_guard.decide, "needs_aux": [], "needs_series": []},
+    "ema_trend": {"label": ema_trend.LABEL, "default_params": ema_trend.DEFAULT_PARAMS, "decide": ema_trend.decide, "needs_aux": [], "needs_series": []},
+    "confirmed_trend": {"label": confirmed_trend.LABEL, "default_params": confirmed_trend.DEFAULT_PARAMS, "decide": confirmed_trend.decide, "needs_aux": [], "needs_series": []},
+    "donchian_breakout": {"label": donchian_breakout.LABEL, "default_params": donchian_breakout.DEFAULT_PARAMS, "decide": donchian_breakout.decide, "needs_aux": [], "needs_series": []},
+    "dual_momentum": {"label": dual_momentum.LABEL, "default_params": dual_momentum.DEFAULT_PARAMS, "decide": dual_momentum.decide, "needs_aux": [], "needs_series": []},
+    "vol_guarded_trend": {"label": vol_guarded_trend.LABEL, "default_params": vol_guarded_trend.DEFAULT_PARAMS, "decide": vol_guarded_trend.decide, "needs_aux": [], "needs_series": []},
 }

@@ -294,8 +294,45 @@ razdoblja (2022–2026, po godinama, uključujući medvjeđe tržište 2022.). N
     nalaza na punom razdoblju, ne nova, potpuno neviđena provjera.
   - 2022-2026 je jedan uzorak tržišne povijesti (jedan ciklus). Max pad je i dalje 44-67% - ovo je
     "manje loše od kupi-i-drži", ne "bez rizika".
-  - Backtest i dalje nije isto što i live trgovanje (vidi odjeljke "Kako je provjereno" i
-    "Sigurnosni mehanizmi" ispod).
+  - Backtest i dalje nije isto što i live trgovanje (vidi odjeljak "Kako je provjereno" ispod).
+
+## Nezavisna provjera s ChatGPT-ovim paralelnim istraživanjem (KriptoMVP 5.1)
+
+Korisnik je dao ChatGPT-u isti `data/kripto.sqlite` (iz ovog projekta) da napravi odvojeni,
+nezavisno napisani backtest paket (`backtest_51.py` i srodne skripte - nije dio ovog repozitorija,
+samo pregledano). Vrijedno je zapisati rezultat te usporedbe:
+
+- **Metodologija se uglavnom poklapa**: odluka nakon zatvaranja svijeće, izvršenje na idućem
+  otvaranju, identičan trošak (0,4% naknada + 0,1% slippage po strani), razvoj parametara samo na
+  2021-2024, provjera na 2025-2026 bez ponovnog podešavanja. ChatGPT-ov paket ima i automatski test
+  za look-ahead bias (promijeni buduće podatke, provjeri da se prošli signal ne mijenja) - dobra
+  praksa koju bi i ovaj projekt trebao imati.
+- **Portirane su nove strategije** (`app/strategies/trend_guard.py`, `ema_trend.py`,
+  `confirmed_trend.py`, `donchian_breakout.py`, `dual_momentum.py`, `vol_guarded_trend.py`) iz
+  njihovog koda, prevedene u ovog projekta `decide(ctx)` oblik. **Cross-validacija**: `trend_guard`
+  (fast=10/slow=40/trend=100) na BTC/ETH/SOL, 2025-01-01 do 2026-11-21, 100 USDT, dao je **točno**
+  102,41 / 151,94 / 96,76 - identično njihovim brojevima, do centa. To je jaka potvrda da oba
+  nezavisna backtest motora (različit jezik stila, ista logika) ispravno implementiraju istu
+  metodologiju.
+- **Usput otkriven i popravljen pravi bug** u `run_backtest`: generički put nije učitavao povijest
+  PRIJE `start_ts`, pa su strategije s dugim lookbackom (SMA100/200) bile "slijepe" prvih
+  100-200 dana TRAŽENOG razdoblja umjesto da koriste već postojeću stvarnu povijest prije njega.
+  Cross-validacija je to otkrila (brojevi se nisu poklapali dok fix nije dodan) - popravljeno je
+  dodavanjem "zagrijavajućeg" baffera prije `start_ts` koji se koristi samo za indikatore, ne za
+  stvarno trgovanje (portfelj uvijek kreće ravno, bez pozicije, na traženi `start_ts` - ista
+  konvencija kao u ChatGPT-ovom paketu). Ovo popravlja preciznost SVIH strategija s dugim
+  lookbackom, ne samo novih.
+- **Njihov glavni nalaz (konzistentan s ovim projektom)**: trend-praćenje s regime-filterom
+  smanjuje max pad naspram kupi-i-drži (32-38% umjesto 63%) uz skroman profit ili gubitak ovisno o
+  coinu - nije dokazana prednost, kompromis rizika. Njihova "rotacija u najjaču valutu" strategija
+  izgledala je izvrsno na 2021-24 (+448%, +196%, +91%) ali se **srušila** na 2025-26 (-46,72%) -
+  klasičan primjer overfittinga na jedan povijesni režim; **ne koristiti za uživo signale** (oboje
+  se slažemo). Njihov kratki 1h/4h test (38 dana) je uglavnom negativan nakon troškova - isti
+  zaključak kao kratkoročna istraživanja u ovom projektu.
+- **Ograničenje nezavisnosti koje i ChatGPT sam ističe**: razdoblje 2025-2026 NIJE potpuno "čisto"
+  neviđeno za obje strane - prije ovog testa je već bilo analizirano u razgovoru s korisnikom
+  (uključujući pad njegovog stvarnog portfelja), pa postoji blagi rizik data-snoopinga i za ovaj
+  projekt i za ChatGPT-ov. Vrijedi uzeti u obzir pri tumačenju "pobjeđuje kupi-i-drži" nalaza.
 
 ## Arhitektura
 

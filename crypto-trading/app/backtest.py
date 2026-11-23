@@ -15,7 +15,15 @@ def run_generic_backtest(
     starting_balance: float,
     aux: dict | None = None,
     series: dict | None = None,
+    start_ts: int | None = None,
 ) -> dict:
+    """`candles` može sadržavati dodatne "zagrijavajuće" svijeće PRIJE `start_ts` (da indikatori s
+    dugim lookbackom, npr. SMA200, imaju povijest od prvog dana traženog razdoblja, ne tek nakon
+    toliko dana unutar njega). `decide()` se poziva za SVAKI indeks (indikatori se ispravno
+    zagrijavaju), ali se trgovine stvarno izvršavaju i equity_curve/trades broje samo od `start_ts`
+    nadalje - portfelj kreće ravno (bez pozicije) na `start_ts`, isto kao u priloženom ChatGPT-ovom
+    paralelnom istraživanju (`backtest_51.py`), radi usporedivosti i da zagrijavanje ne "izmisli"
+    trgovine koje korisnik nije tražio."""
     strategy = GENERIC_STRATEGIES[strategy_key]
     decide = strategy["decide"]
     params = {**strategy["default_params"], **params}
@@ -33,9 +41,15 @@ def run_generic_backtest(
     equity_curve = []
 
     for i in range(len(candles) - 1):
-        ctx = StrategyContext(candles=candles, index=i, in_position=in_position, params=params, aux=aux, series=series)
-        decision = decide(ctx)
         next_candle = candles[i + 1]
+        recording = start_ts is None or next_candle.opened_at >= start_ts
+
+        ctx = StrategyContext(
+            candles=candles, index=i, in_position=in_position if recording else False, params=params, aux=aux, series=series
+        )
+        decision = decide(ctx)
+        if not recording:
+            continue  # zagrijavanje: indikatori se pune, ali se ništa stvarno ne trguje/broji
 
         if decision == "buy" and not in_position:
             fill = buy_fill_price(next_candle.open)
@@ -118,12 +132,15 @@ def run_backtest(
             raise ValueError(f"Nema dovoljno dnevnih svijeća za {pair} u traženom razdoblju.")
         return run_baseline(candles, starting_balance, start_ts, end_ts)
 
-    candles = load_candles(conn, "binance", pair, interval_min, start_ts, end_ts)
-    if len(candles) < 5:
-        raise ValueError(f"Nema dovoljno svijeća za {pair} u traženom razdoblju (interval {interval_min} min).")
-
     if strategy_key not in GENERIC_STRATEGIES:
         raise ValueError(f"Nepoznata strategija: {strategy_key}")
+
+    # Zagrijavanje: učitaj dodatnu povijest PRIJE start_ts da indikatori s dugim lookbackom
+    # (npr. SMA100/SMA200) imaju podatke od prvog dana traženog razdoblja - vidi run_generic_backtest.
+    warmup_seconds = interval_min * 60 * 260
+    candles = load_candles(conn, "binance", pair, interval_min, start_ts - warmup_seconds, end_ts)
+    if len([c for c in candles if c.opened_at >= start_ts]) < 5:
+        raise ValueError(f"Nema dovoljno svijeća za {pair} u traženom razdoblju (interval {interval_min} min).")
 
     aux = {}
     for label in GENERIC_STRATEGIES[strategy_key].get("needs_aux", []):
@@ -145,4 +162,4 @@ def run_backtest(
             )
         series[spec["series_id"]] = points
 
-    return run_generic_backtest(candles, strategy_key, params, starting_balance, aux, series)
+    return run_generic_backtest(candles, strategy_key, params, starting_balance, aux, series, start_ts)
