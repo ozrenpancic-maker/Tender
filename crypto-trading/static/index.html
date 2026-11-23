@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="hr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kripto trgovanje — istraživački MVP</title>
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+<header>
+  <h1>Kripto trgovanje — istraživački MVP</h1>
+  <p>Backtest i usporedba strategija na povijesnim podacima, zatim paper trading na živim cijenama. Live trgovanje pravim novcem je posebno označeno i isključeno po defaultu.</p>
+</header>
+<main>
+
+  <section id="liveStatusSection">
+    <div id="liveBanner" class="banner warn">Provjeravam status live trgovanja…</div>
+  </section>
+
+  <section>
+    <h2>1. Usporedba strategija (backtest na povijesnim podacima)</h2>
+    <p class="muted">
+      Bazno pravilo iz priloženog izvještaja (kupi na +2% dnevni signal) u testiranom razdoblju <strong>gubi novac</strong>
+      (500&nbsp;€ → 108,41&nbsp;€, pad 79,11%). Ovdje možeš testirati druge strategije i uvijek ih usporediti s
+      "buy &amp; hold" (samo kupi i drži) — aktivna strategija ima smisla jedino ako ga nadmaši uz prihvatljiv rizik.
+      Mali broj trgovina u ovim testovima (10–30) znači da rezultat lako može biti slučajnost, ne dokazana prednost.
+    </p>
+    <div class="row">
+      <div class="field">
+        <label>Par</label>
+        <select id="btPair"></select>
+      </div>
+      <div class="field">
+        <label>Od</label>
+        <input type="date" id="btStart" value="2024-01-01" />
+      </div>
+      <div class="field">
+        <label>Do</label>
+        <input type="date" id="btEnd" value="2026-11-21" />
+      </div>
+      <div class="field">
+        <label>Početna sredstva (EUR)</label>
+        <input type="number" id="btBalance" value="500" />
+      </div>
+      <button id="btRunAll">Usporedi sve strategije</button>
+    </div>
+    <table id="btTable" style="display:none">
+      <thead>
+        <tr><th>Strategija</th><th>Završni saldo</th><th>Povrat</th><th>Trgovina</th><th>Profitabilnih</th><th>Max. pad</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div class="chart-wrap">
+      <canvas id="btChart" width="920" height="260"></canvas>
+    </div>
+    <details>
+      <summary>Prilagodi parametre jedne strategije</summary>
+      <div class="row" style="margin-top:10px">
+        <div class="field">
+          <label>Strategija</label>
+          <select id="btStrategy"></select>
+        </div>
+        <div class="field">
+          <label>Parametri (JSON)</label>
+          <input id="btParams" value="{}" style="width:260px" />
+        </div>
+        <button class="secondary" id="btRunOne">Pokreni samo ovu</button>
+      </div>
+    </details>
+  </section>
+
+  <section>
+    <h2>2. Coinbase veza</h2>
+    <p class="muted">Javni cjenovni feed ne treba ključ. Autenticirani dio (stanje računa, slanje naloga) treba API ključ u .env — vidi README.</p>
+    <button id="cbTest">Testiraj vezu</button>
+    <div id="cbResult" style="margin-top:12px"></div>
+  </section>
+
+  <section>
+    <h2>3. Paper trading (simulacija na živim cijenama, bez pravog novca)</h2>
+    <div class="row">
+      <div class="field">
+        <label>Strategija</label>
+        <select id="ppStrategy"></select>
+      </div>
+      <div class="field">
+        <label>Par</label>
+        <select id="ppPair"></select>
+      </div>
+      <div class="field">
+        <label>Virtualna sredstva (EUR)</label>
+        <input type="number" id="ppBalance" value="500" />
+      </div>
+      <button id="ppStart">Pokreni paper run</button>
+    </div>
+    <table id="ppTable" style="display:none">
+      <thead>
+        <tr><th>#</th><th>Strategija</th><th>Par</th><th>Status</th><th>Trenutni saldo</th><th>Akcija</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div id="ppDetail"></div>
+  </section>
+
+  <section>
+    <h2>4. Live trgovanje (pravi novac)</h2>
+    <div id="liveDetailBanner"></div>
+    <div class="row" id="liveStartForm" style="display:none">
+      <div class="field">
+        <label>Strategija</label>
+        <select id="lvStrategy"></select>
+      </div>
+      <div class="field">
+        <label>Par</label>
+        <select id="lvPair"></select>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px">
+        <input type="checkbox" id="lvConfirm" />
+        Razumijem da ovo šalje prave naloge s pravim novcem na mom Coinbase računu
+      </label>
+      <button class="danger-btn" id="lvStart" disabled>Pokreni live trgovanje</button>
+    </div>
+    <table id="lvTable" style="display:none">
+      <thead><tr><th>#</th><th>Strategija</th><th>Par</th><th>Status</th><th>Akcija</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+</main>
+<script src="/app.js"></script>
+</body>
+</html>

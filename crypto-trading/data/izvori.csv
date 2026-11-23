@@ -1,0 +1,22 @@
+id,category,name,url,import_method
+binance,exchange,Binance,https://github.com/binance/binance-public-data,ZIP OHLCV
+kraken,exchange,Kraken,https://docs.kraken.com/api/docs/rest-api/get-ohlc-data,REST OHLC
+coinbase,exchange,Coinbase Exchange,https://docs.cdp.coinbase.com/exchange/reference/exchangerestapi_getproductcandles,REST OHLCV
+okx,exchange,OKX,https://www.okx.com/docs-v5/en/#order-book-trading-market-data-get-candlesticks-history,REST OHLCV
+bybit,exchange,Bybit,https://bybit-exchange.github.io/docs/v5/market/kline,Planirani API
+gate,exchange,Gate,https://www.gate.com/docs/developers/apiv4/,Planirani API
+kucoin,exchange,KuCoin,https://www.kucoin.com/docs-new/rest/spot-trading/market-data/get-klines,Planirani API
+bullish,exchange,Bullish,https://docs.exchange.bullish.com/,Planirani API
+mexc,exchange,MEXC,https://www.mexc.com/api-docs/spot-v3/market-data-endpoints,Planirani API
+upbit,exchange,Upbit,https://global-docs.upbit.com/reference/list-candles-days,Planirani API
+coinmetrics,index,Coin Metrics Community,https://github.com/coinmetrics/data,CSV dnevna referentna cijena
+sec,filing,SEC EDGAR,https://www.sec.gov/search-filings/edgar-application-programming-interfaces,JSON metapodaci i CSV događaji
+fed,macro,Federal Reserve,https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm,CSV događaji
+bls,macro,US Bureau of Labor Statistics,https://www.bls.gov/schedule/news_release/cpi.htm,CSV događaji
+gdelt,news,GDELT,https://blog.gdeltproject.org/gdelt-2-0-our-global-world-in-realtime/,CSV događaji
+issuer,issuer,Službene objave izdavatelja,https://www.strategy.com/press,CSV događaji
+x,social,X,https://docs.x.com/x-api/posts/search/introduction,CSV događaji iz odobrenog izvora
+reddit,social,Reddit,https://support.reddithelp.com/hc/en-us/articles/16160319875092-Reddit-Data-API-Wiki,CSV događaji iz odobrenog izvora
+bitcointalk,forum,BitcoinTalk,https://bitcointalk.org/,CSV referenci na odabrane teme
+ethereum_magicians,forum,Ethereum Magicians,https://ethereum-magicians.org/,CSV referenci na odabrane teme
+etf,issuer,Objave ETF izdavatelja,https://www.ishares.com/us/products/333011/ishares-bitcoin-trust,CSV događaji
