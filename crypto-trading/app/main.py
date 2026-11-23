@@ -11,6 +11,8 @@ from app.backtest import run_backtest
 from app.candles import available_pairs
 from app.macro_clients import MACRO_CLIENTS, all_labels, test_all_connections
 from app.optimizer import DEFAULT_GRIDS, optimize
+from app.ml.dataset import HORIZONS as ML_HORIZONS
+from app.ml.engine import compute_all as compute_all_predictions, compute_prediction
 from app.signals import PRESETS as SIGNAL_PRESETS, compute_all as compute_all_signals
 from app.strategies import GENERIC_STRATEGIES
 
@@ -214,6 +216,42 @@ def signals_presets():
 def signals(pairs: str = ""):
     pair_list = [p.strip() for p in pairs.split(",") if p.strip()] or list(binance_history_client.PORTFOLIO_PAIRS)
     return {"signals": compute_all_signals(pair_list)}
+
+
+# ---------- AI Prediction Engine (ML, kalibrirane vjerojatnosti, 4 horizonta) ----------
+
+@app.get("/api/predictions/horizons")
+def prediction_horizons():
+    import json
+    from app.ml.engine import MODELS_DIR
+
+    meta_path = MODELS_DIR / "metadata.json"
+    meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+    return {
+        h: {
+            "label": spec["label"],
+            "validated": meta.get(h, {}).get("validated", False),
+            "trained_at": meta.get(h, {}).get("trained_at"),
+            "n_examples": meta.get(h, {}).get("n_examples"),
+        }
+        for h, spec in ML_HORIZONS.items()
+    }
+
+
+@app.get("/api/predictions")
+def predictions(pairs: str = ""):
+    pair_list = [p.strip() for p in pairs.split(",") if p.strip()] or list(binance_history_client.PORTFOLIO_PAIRS)
+    return {"predictions": compute_all_predictions(pair_list)}
+
+
+@app.get("/api/predictions/{pair_a}/{pair_b}/{horizon}")
+def prediction_single(pair_a: str, pair_b: str, horizon: str):
+    """pair_a/pair_b jer parovi sadrže '/' (npr. BTC/USDT) - FastAPI ga ne prihvaća u jednom
+    path segmentu bez posebnog pretvarača, pa je par rastavljen na dva segmenta."""
+    try:
+        return compute_prediction(f"{pair_a}/{pair_b}", horizon)
+    except Exception as err:
+        raise HTTPException(400, str(err))
 
 
 # ---------- Wall Street / equity indeksi ----------

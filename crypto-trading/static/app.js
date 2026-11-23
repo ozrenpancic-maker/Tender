@@ -534,7 +534,7 @@ async function refreshSignals() {
     }
 
     table.style.display = "table";
-    statusEl.textContent = `Ažurirano ${new Date().toLocaleTimeString("hr-HR")}. Prije prvog pokretanja sinkroniziraj povijest (odjeljak 2) za coinove koje želiš vidjeti ovdje.`;
+    statusEl.textContent = `Ažurirano ${new Date().toLocaleTimeString("hr-HR")}. Prije prvog pokretanja sinkroniziraj povijest (odjeljak 3) za coinove koje želiš vidjeti ovdje.`;
   } catch (err) {
     statusEl.textContent = "Greška: " + err.message;
   }
@@ -542,9 +542,66 @@ async function refreshSignals() {
 
 document.getElementById("sigRefresh").addEventListener("click", refreshSignals);
 
+// ---------- AI Prediction Engine (ML) ----------
+
+const DECISION_CLASS = {
+  "STRONG SELL": "fail",
+  SELL: "fail",
+  WAIT: "",
+  BUY: "ok",
+  "STRONG BUY": "ok",
+  "NEMA DOVOLJNO POUZDANIH PODATAKA": "",
+};
+
+function decisionBadge(decision) {
+  const cls = DECISION_CLASS[decision] || "";
+  return cls ? `<span class="pill ${cls}">${decision}</span>` : decision;
+}
+
+async function refreshPredictions() {
+  const statusEl = document.getElementById("predStatus");
+  const table = document.getElementById("predTable");
+  statusEl.textContent = "Dohvaćam AI predikcije…";
+
+  try {
+    const { predictions } = await api("/api/predictions");
+    const tbody = table.querySelector("tbody");
+    tbody.innerHTML = "";
+
+    for (const [pair, byHorizon] of Object.entries(predictions)) {
+      for (const [horizon, pred] of Object.entries(byHorizon)) {
+        if (pred.error) continue;
+        const tr = document.createElement("tr");
+        const probs =
+          pred.p_up != null
+            ? `${fmtPct(pred.p_up * 100)} / ${fmtPct(pred.p_down * 100)} / ${fmtPct(pred.p_sideways * 100)}`
+            : "—";
+        const reasons = [...(pred.reasons_for || []), ...(pred.reasons_against || [])].slice(0, 2).join(" ");
+        tr.innerHTML = `
+          <td><strong>${pair}</strong></td>
+          <td>${pred.horizon_label || horizon}</td>
+          <td>${decisionBadge(pred.decision)}</td>
+          <td>${pred.ai_score != null ? pred.ai_score : "—"}</td>
+          <td>${probs}</td>
+          <td class="muted" style="font-size:12px">${reasons}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    table.style.display = "table";
+    statusEl.textContent = `Ažurirano ${new Date().toLocaleTimeString("hr-HR")}.`;
+  } catch (err) {
+    statusEl.textContent = "Greška: " + err.message;
+  }
+}
+
+document.getElementById("predRefresh").addEventListener("click", refreshPredictions);
+
 init();
 setInterval(refreshPaperRuns, 30000);
 refreshSignals();
+refreshPredictions();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

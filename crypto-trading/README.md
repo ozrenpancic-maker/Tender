@@ -16,10 +16,10 @@ sada - samo analiza/backtest.
 od portfelja koji je ovoliko u minusu - to bi bilo prazno obećanje. `app/binance_history_client.py`
 dodaje mogućnost dohvaćanja povijesti za BAŠ te coinove (izvorna baza je imala samo BTC/ETH/SOL),
 da bi se strategije mogle pošteno testirati na njima umjesto nagađanja. Čim se sinkroniziraju
-(dashboard, odjeljak 2), odmah su dostupni u backtestu/optimizatoru (odjeljci 3 i 6) jer koriste
-isti `candle` format - ništa se drugo ne mijenja u kodu. Dodan je i **odjeljak 1 "Signali
-kupi/prodaj"** koji direktno odgovara na pitanje "kad kupiti/prodati koji coin" - vidi novu sekciju
-ispod.
+(dashboard, odjeljak 3), odmah su dostupni u backtestu/optimizatoru (odjeljci 4 i 7) jer koriste
+isti `candle` format - ništa se drugo ne mijenja u kodu. Dodan je i **odjeljak 2 "Signali
+kupi/prodaj"** (i odjeljak 1 "AI Prediction Engine" - vidi ispod) koji direktno odgovara na pitanje
+"kad kupiti/prodati koji coin" - vidi nove sekcije ispod.
 
 Napomene specifične za ove coinove:
 - PEPE i SUI su mladi (2023.) - mnogo kraća povijest za testiranje znači manje statističke snage;
@@ -31,7 +31,98 @@ Napomene specifične za ove coinove:
   njega, Binance možda još uvijek koristi stari simbol za taj par, provjeri i ispravi u
   `PORTFOLIO_PAIRS`.
 
-## Signali kupi/prodaj (`app/signals.py`, dashboard odjeljak 1)
+## AI Prediction Engine (`app/ml/`, dashboard odjeljak 1)
+
+KriptoMVP 4.4 faza 3 - ML model (LightGBM + logistička regresija kao kontrola) koji za 4 neovisna
+horizonta (1h/4h/24h/7d) vraća **kalibrirane** vjerojatnosti P(up)/P(down)/P(sideways) (zbrajaju se
+na 100%), AI Score (0-100, ocjena KVALITETE I SMJERA signala, ne izravna vjerojatnost rasta - vidi
+formula ispod), kategoriju (STRONG SELL...STRONG BUY po pragovima iz specifikacije), razloge za/
+protiv, i procjenu kvalitete podataka. Ovo je ODVOJENO od jednostavnog rule-based `app/signals.py`
+(dashboard odjeljak 2) - oba ostaju, dashboard ih prikazuje kao dvije različite stvari s različitim
+razinama pouzdanosti.
+
+### Metodologija (bitno za povjerenje u rezultat, ne samo za kod)
+
+1. **Značajke** (`app/ml/features.py`) - 20 tehničkih indikatora po svijeći (RSI14, Stoch RSI,
+   MACD histogram, udaljenost od EMA9/21/50/200 i SMA20/50/200, ATR normaliziran, percentil
+   volatilnosti, Bollinger %b i širina, ROC na 3 duljine, relativni volumen, udaljenost od
+   20-svijeća maksimuma/minimuma). Svaka značajka na indeksu `i` koristi ISKLJUČIVO svijeće
+   `[0..i]` - nema gledanja unaprijed.
+2. **Label** (`app/ml/labels.py`) - 3 klase (up/down/sideways). Granica između klasa NIJE fiksni
+   postotak, nego `max(trošak_round_trip ≈1%, 0.5 × ATR_normaliziran × √broj_koraka)` - veća je kad
+   je tržište volatilnije i kad je horizont dulji, manja kad je mirno. Label na indeksu `i` gleda
+   `candles[i + steps_ahead].close` - to je JEDINO mjesto u cijelom pipelineu gdje se gleda
+   unaprijed, namjerno odvojeno od značajki.
+3. **Walk-forward validacija** (`app/ml/dataset.py`) - podaci (pooled BTC/ETH/SOL, parovi se NE
+   kodiraju kao značajka) podijeljeni kronološki u foldove; za svaki fold: train (expanding
+   window) → zadnjih 20% toga je kalibracijski skup (izolirana kalibracija vjerojatnosti preko
+   `CalibratedClassifierCV` s izotoničnom regresijom) → test na SLJEDEĆEM, još neviđenom bloku.
+   Nijedan test primjer nikad nije korišten za fit ili kalibraciju bilo kojeg modela koji ga
+   predviđa - standardna zaštita od look-ahead/data leakage biasa.
+4. **Kalibracija i poštena provjera** (`app/ml/calibration.py`) - Brier score (multiklasni),
+   log loss, reliability dijagram (pouzdanost vs stvarna točnost po binovima), i NAIVNA bazna
+   linija (model koji uvijek predviđa udio klasa iz treninga, "ne znam ništa"). Model se smatra
+   **validiranim** samo ako je njegov Brier score barem 2% relativno bolji od bazne linije na
+   walk-forward testu (pravilo #12/#13: nevalidiran model ne aktivira live preporuku).
+
+### Pošten rezultat prvog treniranja (23.11.2026., nad podacima dostupnim u ovom razvojnom okruženju)
+
+| Horizont | Uzorak (n) | LightGBM Brier | Bazna linija Brier | Validiran? |
+|---|---|---|---|---|
+| 1h | 7533 (resample 5-min→1h, 113 dana) | 0,1107 | 0,1112 | **NE** (razlika unutar šuma) |
+| 4h | 1431 (resample 5-min→4h, 113 dana) | 0,4057 | 0,3784 | **NE** (lošiji od bazne linije) |
+| 24h | 8459 (prava dnevna povijest, 2017/2020-2026) | 0,5262 | 0,5250 | **NE** |
+| 7d | 8441 (prava dnevna povijest, label 7 dana unaprijed) | 0,5669 | 0,5562 | **NE** |
+
+**Nijedan horizont trenutno nije prošao validaciju.** `/api/predictions` zato za sve coinove/
+horizonte vraća `"NEMA DOVOLJNO POUZDANIH PODATAKA"` - to je pravilo #8 na djelu (nepouzdan model →
+WAIT, ne izmišljena sigurnost), ne greška u kodu. Ovo je konzistentno s ranijim nalazom u ovom
+projektu (vidi "Ključni nalaz" ispod) da jednostavni mehanički signali na BTC/ETH/SOL ne pokazuju
+robusnu prednost nad "ne radi ništa" - ML pristup s ovim značajkama i ovom količinom podataka to
+potvrđuje na stroži, kalibriran način, ne osporava.
+
+Što bi moglo promijeniti ovo (poštene, ne zagarantirane ideje za sljedeću iteraciju):
+- Više povijesti za 1h/4h (sinkroniziraj izravno s Binancea nekoliko godina 1h/4h svijeća, ne samo
+  113 dana resampliranih iz 5-min) - trenutni uzorak za 4h je posebno tanak (1431 primjera).
+- Dodatne značajke iz već postojećih klijenata u ovoj app-i (makro, derivatives funding/OI,
+  sentiment, on-chain) - trenutni model vidi SAMO cijenu/volumen, ništa od ostatka faza 1 podataka.
+- Drugi feature inženjering (npr. relativna snaga parova, market regime kao ulazna značajka).
+- Prag "validiran" (2% relativno bolji Brier) je namjerno strog da se spriječi lažno pozitivan
+  rezultat (prva verzija s pragom 0% je "validirala" 1h horizont s poboljšanjem od samo 0,0005 -
+  vjerojatno šum, ne stvarna vještina, zbog jako neravnomjerne raspodjele klasa na 1h).
+
+### AI Score formula (transparentna, ne "crna kutija")
+
+```
+AI Score = round(100 × P(up) + 50 × P(sideways) + 0 × P(down))
+```
+
+Linearna skala: siguran "up" = 100, siguran "sideways" = 50 (WAIT zona), siguran "down" = 0. Ovo je
+ocjena kvalitete+smjera, NE izravna vjerojatnost rasta (pravilo #7) - vjerojatnosti su u `p_up`/
+`p_down`/`p_sideways` poljima odgovora, odvojeno. Kategorije po specifikaciji: 0-25 STRONG SELL,
+26-45 SELL, 46-55 WAIT, 56-75 BUY, 76-100 STRONG BUY.
+
+### Kako ponovno trenirati
+
+```bash
+cd crypto-trading && source .venv/bin/activate
+pip install lightgbm scikit-learn joblib   # ako već nisu instalirani
+python3 -m app.ml.train
+```
+
+Zapisuje `data/models/<horizont>_lgbm.joblib` i `data/models/metadata.json` (walk-forward metrike,
+`validated` zastavica koju `app/ml/engine.py` čita). Siguran je za ponovno pokretanje - briše i
+ponovno piše iste datoteke, ne mijenja ništa drugo u bazi.
+
+### Razlozi za/protiv (`reasons_for`/`reasons_against`)
+
+Namjerno NISU SHAP vrijednosti (ta ovisnost bi se mogla dodati u fazi 6 ako pokaže mjerljivu
+korist) - to su jednostavna, provjerljiva pravila koja izravno čitaju vrijednost značajke i
+uspoređuju s dokumentiranim pragom (npr. "RSI14 < 30 → razlog za", "cijena iznad EMA200 → razlog
+za"). Transparentnije za sada nego aproksimacija važnosti značajki iz modela, iako manje precizno
+povezano sa stvarnom odlukom tog konkretnog modela.
+
+## Signali kupi/prodaj (`app/signals.py`, dashboard odjeljak 2)
 
 Korisnik je tražio da aplikacija izravno kaže "kad kupiti koji kripto i kada prodati", u dva
 horizonta: kratkoročno (2h do par dana) i dugoročno (3+ mjeseca). Prije gradnje, kratkoročni dio je
@@ -88,14 +179,14 @@ Tri nove strategije su dodane da bi se moglo tražiti nešto bolje: `sma_crossov
 fast=5/slow=20 je u ovom jednom testu nadmašio i baseline i "buy & hold" (908 € nasuprot 710 € za
 buy&hold i 108 € za baseline). **Ovo NIJE dokaz trajne prednosti** — uzorak ima svega ~26 trgovina
 na jednom paru u jednom (uglavnom rastućem) tržišnom razdoblju, što je premalo da se isključi
-slučajnost ili da se zaključi da će raditi i ubuduće. Koristi dashboard (odjeljak 3) da testiraš
+slučajnost ili da se zaključi da će raditi i ubuduće. Koristi dashboard (odjeljak 4) da testiraš
 više parova, razdoblja i parametara prije nego ičemu vjeruješ.
 
 Dodane su i dvije strategije s makro kontekstom: `equity_filtered` (isti SMA presjek, ali 'buy' je
 dopušten samo kad je S&P 500 iznad svog 50-dnevnog prosjeka) i `multi_macro_filter` (isto, plus
 zahtijeva da zlato NIJE u naglom skoku - tipičan znak "bijega u sigurnost"/risk-off raspoloženja).
 Obje testiraju ideju da kripto cijene dobrim dijelom prate opće tržišno raspoloženje. Trebaju
-sinkronizirane S&P 500 / zlato podatke (dashboard, odjeljak 4) prije pokretanja backtesta; bez toga
+sinkronizirane S&P 500 / zlato podatke (dashboard, odjeljak 5) prije pokretanja backtesta; bez toga
 bacaju jasnu grešku umjesto da tiho zanemare filter.
 
 ### Širi popis čimbenika (tehnička analiza, makro, sentiment, regulativa, fundamentalno)
@@ -118,9 +209,9 @@ RSI, ROC, OBV, ATR, Bollinger Bands).
 **`macro_signal_composite`** - obavezan EMA200 trend gate plus glasovanje 4 neovisna signala (Fed
 stopa ne raste, Reddit sentiment, regulatorni skor, ETF tokovi) - kupnja samo ako dovoljno glasova
 kaže "risk-on". Nedostajući podatak se ne broji ni za ni protiv (ne nagađa se). Treba sve 4 serije
-sinkronizirane (dashboard, odjeljak 5) prije backtesta.
+sinkronizirane (dashboard, odjeljak 6) prije backtesta.
 
-Novi besplatni/sivo-područje izvori (dashboard, odjeljak 5; detalji i env varijable u "Pokretanje"):
+Novi besplatni/sivo-područje izvori (dashboard, odjeljak 6; detalji i env varijable u "Pokretanje"):
 
 | Izvor | Što daje | Cijena | Pouzdanost |
 |---|---|---|---|
@@ -155,7 +246,7 @@ nešto od ovoga, javi koji servis planiraš platiti pa se dogradi integracija s 
 
 ### Zašto "pronađi profitabilnu strategiju" nije tako jednostavno kako zvuči
 
-Dodan je **optimizator s in-sample/out-of-sample provjerom** (dashboard, odjeljak 6; `app/optimizer.py`)
+Dodan je **optimizator s in-sample/out-of-sample provjerom** (dashboard, odjeljak 7; `app/optimizer.py`)
 jer je ručno biranje parametara dok rezultat na JEDNOM razdoblju ne izgleda dobro klasičan "curve
 fitting" - gotovo uvijek postoji neka kombinacija koja na papiru izgleda sjajno čistom slučajnošću.
 Konkretan primjer iz ovog projekta: `sma_crossover` optimiziran na 2024–2025 (in-sample) daje
@@ -215,8 +306,13 @@ razdoblja (2022–2026, po godinama, uključujući medvjeđe tržište 2022.). N
 - **`app/backtest.py`** + **`app/strategies/`** — generički dnevni backtest engine (odluka nakon
   zatvaranja dana, izvršenje na idućem otvaranju) i strategije. Svaka strategija je čista funkcija
   `(context) -> "buy"/"sell"/"hold"`, pa se identičan kod koristi i za backtest i za paper/live.
-- **`app/coinbase_client.py`** — javni cjenovni feed (bez ključa) i autenticirani Advanced Trade
-  API klijent (CDP API ključ, ES256 JWT).
+- **`app/coinbase_client.py`** — ISKLJUČIVO javni cjenovni feed (bez ključa). Autenticirani dio je
+  uklonjen (KriptoMVP 4.4 pravila) - vidi "Isključivo savjetnik/simulator" ispod.
+- **`app/ml/`** — AI Prediction Engine (faza 3): `features.py` (značajke), `labels.py` (3-klasni
+  label, trošak+volatilnost-skalirana granica), `dataset.py` (pooled BTC/ETH/SOL, walk-forward
+  foldovi), `calibration.py` (Brier/log loss/reliability + bazna linija), `train.py` (LightGBM +
+  logistička regresija), `engine.py` (uživo predikcija, WAIT gate za nevalidirane horizonte). Vidi
+  "AI Prediction Engine" iznad.
 - **`app/equity_client.py`** — dnevni podaci za S&P 500 / Dow / Nasdaq / zlato sa Stooq-a (javno,
   bez ključa), za makro-filter strategije. `app/aux.py` poravnava kripto (trguje se 7 dana u tjednu)
   i equity/zlato (zatvoreno vikendom) kalendare uzimanjem zadnje poznate cijene na/prije danog dana.
@@ -352,7 +448,7 @@ trading i backtest.
   razliku od trend-prateećih strategija u ovom projektu - testira drukčiju tezu, nije "poboljšana
   verzija" nečeg postojećeg. Pragovi ekstrema (`extreme_negative`/`extreme_positive`) su proizvoljno
   postavljeni početni pokušaji, ne kalibrirani na povijesnu distribuciju funding ratea - koristi
-  optimizator (odjeljak 6) prije vjerovanja bilo kojoj konkretnoj vrijednosti.
+  optimizator (odjeljak 7) prije vjerovanja bilo kojoj konkretnoj vrijednosti.
 - `github_client.py` prati samo broj commitova, ne i njihovu kvalitetu/veličinu - jedan commit koji
   mijenja jedan redak broji se jednako kao veliki refactor. Grub proxy za aktivnost, ne za kvalitetu
   razvoja.
@@ -362,15 +458,15 @@ trading i backtest.
 - `binance_history_client.py` sinkronizira cijelu dostupnu povijest pri svakom pozivu (nema
   inkrementalnog "samo nove podatke" moda) - za coinove s dugom poviješću (DOGE postoji od 2019.)
   prvi sync može potrajati zbog straniciranja Binance API-ja (max 1000 svijeća po pozivu).
-- Rezultat backtesta/optimizatora na tvojim konkretnim coinovima (odjeljci 3 i 6) NIJE unaprijed
+- Rezultat backtesta/optimizatora na tvojim konkretnim coinovima (odjeljci 4 i 7) NIJE unaprijed
   poznat - možda će neka strategija pokazati prednost, možda neće nijedna, kao što se dogodilo s
   BTC/ETH/SOL (vidi "Ključni nalaz" i "Pretraga po više parova" gore). Pokreni ga i pogledaj
   rezultat pošteno, ne traži potvrdu onoga što bi želio čuti.
-- "Signali kupi/prodaj" (odjeljak 1) rade uvijek na NAJNOVIJOJ dostupnoj svijeći, koja kod 4h
+- "Signali kupi/prodaj" (odjeljak 2) rade uvijek na NAJNOVIJOJ dostupnoj svijeći, koja kod 4h
   intervala može biti još "u tijeku" (nedovršena) - Binance klines endpoint je ne isključuje
   automatski. Za živi signal to je razumno (želiš najsvježiju cijenu), ali znači da se vrijednost
   može malo promijeniti do kraja te 4h svijeće - nije isto kao strogo zatvorena povijesna svijeća
   korištena u backtestu.
 - Kratkoročni preset u "Signali kupi/prodaj" treba sinkronizirane 4h podatke da bi ga mogao i
   backtestirati (ne samo gledati živi signal) - koristi `interval: "4h"` pri sync pozivu
-  (`/api/binance-history/sync`) ili dashboard sekciju 2 s odgovarajućim odabirom intervala.
+  (`/api/binance-history/sync`) ili dashboard sekciju 3 s odgovarajućim odabirom intervala.

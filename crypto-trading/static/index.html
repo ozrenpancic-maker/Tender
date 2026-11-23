@@ -26,7 +26,32 @@
   </section>
 
   <section>
-    <h2>1. Signali kupi/prodaj</h2>
+    <h2>1. AI Prediction Engine (ML, kalibrirane vjerojatnosti)</h2>
+    <p class="muted">
+      LightGBM + logistička regresija, 4 neovisna horizonta (1h/4h/24h/7d), walk-forward validirano
+      protiv naivne bazne linije (vjerojatnost = udio klasa u treningu) - vidi README "AI Prediction
+      Engine" za potpunu metodologiju. <strong>POŠTENO STANJE:</strong> na prvom treniranju nad
+      podacima dostupnim u ovom razvojnom okruženju (BTC/ETH/SOL), <strong>nijedan od 4 horizonta
+      nije prošao validaciju</strong> - model nije značajno bolji od "ne znam ništa" bazne linije.
+      To znači da ovaj odjeljak trenutno vraća "NEMA DOVOLJNO POUZDANIH PODATAKA" za sve - to je
+      namjerno ponašanje (pravilo da nevalidiran model ne glumi da radi), ne greška. Ne izmišlja se
+      AI Score ni vjerojatnost dok validacija ne prođe.
+    </p>
+    <button id="predRefresh">Osvježi AI predikcije</button>
+    <div id="predStatus" class="muted" style="margin-top:8px"></div>
+    <table id="predTable" style="display:none">
+      <thead>
+        <tr>
+          <th>Coin</th><th>Horizont</th><th>Odluka</th><th>AI Score</th>
+          <th>P(up)/P(down)/P(sideways)</th><th>Razlozi</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>2. Signali kupi/prodaj</h2>
     <p class="muted">
       Trenutna (uživo) odluka mehaničke strategije za svaki coin iz portfelja, u dva horizonta.
       <strong>Ovo nisu preporuke financijskog savjetnika i mogu biti u krivu.</strong> Kratkoročni
@@ -51,7 +76,7 @@
   </section>
 
   <section>
-    <h2>2. Tvoj portfolio — sinkroniziraj povijest</h2>
+    <h2>3. Tvoj portfolio — sinkroniziraj povijest</h2>
     <p class="muted">
       Backtest i optimizator rade samo nad parovima koji su već sinkronizirani u bazu. Izvorna baza
       pokriva BTC/ETH/SOL - za ostale coinove (npr. iz tvog stvarnog portfelja) prvo ih sinkroniziraj
@@ -81,7 +106,7 @@
   </section>
 
   <section>
-    <h2>3. Usporedba strategija (backtest na povijesnim podacima)</h2>
+    <h2>4. Usporedba strategija (backtest na povijesnim podacima)</h2>
     <p class="muted">
       Bazno pravilo iz priloženog izvještaja (kupi na +2% dnevni signal) u testiranom razdoblju <strong>gubi novac</strong>
       (500&nbsp;€ → 108,41&nbsp;€, pad 79,11%). Ovdje možeš testirati druge strategije i uvijek ih usporediti s
@@ -133,9 +158,9 @@
   </section>
 
   <section>
-    <h2>4. Wall Street i zlato (S&amp;P 500, Dow, Nasdaq, zlato)</h2>
+    <h2>5. Wall Street i zlato (S&amp;P 500, Dow, Nasdaq, zlato)</h2>
     <p class="muted">
-      Dnevni podaci s javnog Stooq izvora, bez ključa. Strategije s makro filterom (odjeljak 3) koriste ovo da
+      Dnevni podaci s javnog Stooq izvora, bez ključa. Strategije s makro filterom (odjeljak 4) koriste ovo da
       kripto signal propuste samo kad je makro okruženje "risk-on". Korelacija kripta s dioničkim tržištem/zlatom
       nije zajamčena da će se nastaviti — ovo je alat za testiranje te ideje, ne potvrđena strategija.
     </p>
@@ -147,7 +172,7 @@
   </section>
 
   <section>
-    <h2>5. Makro, sentiment i regulativa</h2>
+    <h2>6. Makro, sentiment i regulativa</h2>
     <p class="muted">
       Besplatni izvori: <strong>FRED</strong> (Fed stopa/CPI/nezaposlenost/M2/prinosi na obveznice — treba
       besplatan FRED_API_KEY), <strong>DeFiLlama</strong> (TVL, bez ključa), <strong>CoinGecko</strong>
@@ -158,7 +183,7 @@
       <strong>regulativa</strong> (grubo brojanje riječi), <strong>CryptoPanic</strong> (stvarni glasovi
       zajednice, treba besplatnu registraciju) i <strong>ETF tokovi</strong> (scraping farside.co.uk).
       Leksikonski dijelovi nisu pravna ni NLP analiza — tretiraj kao grub signal, ne zaključak.
-      Koriste ih strategije "Makro glasovanje" i "Derivati - funding rate ekstremi" (odjeljak 3).
+      Koriste ih strategije "Makro glasovanje" i "Derivati - funding rate ekstremi" (odjeljak 4).
     </p>
     <div class="row">
       <button class="secondary" id="macroTest">Testiraj sve veze</button>
@@ -168,7 +193,7 @@
   </section>
 
   <section>
-    <h2>6. Optimizacija parametara (in-sample / out-of-sample)</h2>
+    <h2>7. Optimizacija parametara (in-sample / out-of-sample)</h2>
     <p class="muted">
       Pretražuje kombinacije parametara na "in-sample" razdoblju i rangira ih po rezultatu, zatim
       par najboljih provjerava na "out-of-sample" razdoblju koje optimizacija nije vidjela.
@@ -222,14 +247,14 @@
   </section>
 
   <section>
-    <h2>7. Coinbase veza</h2>
+    <h2>8. Coinbase veza</h2>
     <p class="muted">Javni cjenovni feed ne treba ključ. Autenticirani dio (stanje računa, slanje naloga) treba API ključ u .env — vidi README.</p>
     <button id="cbTest">Testiraj vezu</button>
     <div id="cbResult" style="margin-top:12px"></div>
   </section>
 
   <section>
-    <h2>8. Paper trading (simulacija na živim cijenama, bez pravog novca)</h2>
+    <h2>9. Paper trading (simulacija na živim cijenama, bez pravog novca)</h2>
     <div class="row">
       <div class="field">
         <label>Strategija</label>
@@ -255,11 +280,11 @@
   </section>
 
   <section>
-    <h2>9. Live trgovanje</h2>
+    <h2>10. Live trgovanje</h2>
     <p class="muted">
       Namjerno uklonjeno (KriptoMVP 4.4 nepromjenjiva pravila) - aplikacija je isključivo savjetnik
       i simulator. Ne postoji kod koji šalje prave naloge niti traži Coinbase trgovačke API
-      ključeve ili pristup računu/novčaniku. Koristi "Paper trading" (odjeljak 8) za simulaciju.
+      ključeve ili pristup računu/novčaniku. Koristi "Paper trading" (odjeljak 9) za simulaciju.
     </p>
   </section>
 
