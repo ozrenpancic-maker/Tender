@@ -1,7 +1,18 @@
 """Registar svih makro/sentiment/fundamentalnih klijenata - svaki modul izlaže:
 fetch_recent(label, days) -> list[(timestamp, value)], sync_to_db(conn, label) -> int, test_connection() -> dict.
 """
-from app import coingecko_client, defillama_client, etf_client, fred_client, reddit_client, regulatory_client, trends_client
+from app import (
+    binance_derivatives_client,
+    coingecko_client,
+    cryptopanic_client,
+    defillama_client,
+    etf_client,
+    fred_client,
+    github_client,
+    reddit_client,
+    regulatory_client,
+    trends_client,
+)
 
 MACRO_CLIENTS = {
     "fred": fred_client,
@@ -11,6 +22,9 @@ MACRO_CLIENTS = {
     "reddit": reddit_client,
     "etf_flow": etf_client,
     "regulatory": regulatory_client,
+    "binance_futures": binance_derivatives_client,
+    "github": github_client,
+    "cryptopanic": cryptopanic_client,
 }
 
 
@@ -26,6 +40,9 @@ _LABELS_ATTR = {
     "reddit": "SUBREDDITS",
     "etf_flow": "FARSIDE_URLS",
     "regulatory": "FEEDS",
+    "binance_futures": "FUNDING_SYMBOLS",
+    "github": "REPOS",
+    "cryptopanic": "FILTERS",
 }
 
 

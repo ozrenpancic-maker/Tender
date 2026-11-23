@@ -37,6 +37,12 @@ DEFAULT_GRIDS: dict[str, dict[str, list]] = {
         "min_risk_on_votes": [2, 3, 4],
         "fed_lookback": [1, 3, 6],
     },
+    "derivatives_extremes": {
+        "extreme_negative": [-0.001, -0.0007, -0.0005, -0.0003],
+        "extreme_positive": [0.0003, 0.0005, 0.0007, 0.001],
+        "lookback_days": [1, 3, 5],
+        "hold_days": [3, 5, 7, 10],
+    },
 }
 
 MAX_COMBINATIONS = 400

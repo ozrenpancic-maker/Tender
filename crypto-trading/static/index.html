@@ -86,13 +86,16 @@
   <section>
     <h2>3. Makro, sentiment i regulativa</h2>
     <p class="muted">
-      Besplatni izvori: <strong>FRED</strong> (Fed stopa/CPI/nezaposlenost — treba besplatan FRED_API_KEY),
-      <strong>DeFiLlama</strong> (TVL, bez ključa), <strong>CoinGecko</strong> (ponuda tokena, bez ključa).
-      Sivo područje (neslužbeno/krhko): <strong>Google Trends</strong> (neslužbeni scraping),
-      <strong>Reddit</strong> (grub leksikon sentimenta, treba besplatnu registraciju aplikacije),
-      <strong>ETF tokovi</strong> (scraping farside.co.uk) i <strong>regulativa</strong> (SEC/CFTC RSS,
-      grub leksikon). Ovo posljednje nije pravna ni NLP analiza — tretiraj kao grub signal, ne zaključak.
-      Koristi ga strategija "Makro glasovanje" (odjeljak 1).
+      Besplatni izvori: <strong>FRED</strong> (Fed stopa/CPI/nezaposlenost/M2/prinosi na obveznice — treba
+      besplatan FRED_API_KEY), <strong>DeFiLlama</strong> (TVL, bez ključa), <strong>CoinGecko</strong>
+      (ponuda tokena, bez ključa), <strong>Binance futures</strong> (funding rate — povijest godinama
+      unatrag, bez ključa) i <strong>GitHub</strong> (aktivnost razvoja, bez ključa ili s besplatnim
+      tokenom za viši limit). Sivo područje (neslužbeno/krhko ili grub leksikon):
+      <strong>Google Trends</strong> (neslužbeni scraping), <strong>Reddit</strong> i
+      <strong>regulativa</strong> (grubo brojanje riječi), <strong>CryptoPanic</strong> (stvarni glasovi
+      zajednice, treba besplatnu registraciju) i <strong>ETF tokovi</strong> (scraping farside.co.uk).
+      Leksikonski dijelovi nisu pravna ni NLP analiza — tretiraj kao grub signal, ne zaključak.
+      Koriste ih strategije "Makro glasovanje" i "Derivati - funding rate ekstremi" (odjeljak 1).
     </p>
     <div class="row">
       <button class="secondary" id="macroTest">Testiraj sve veze</button>

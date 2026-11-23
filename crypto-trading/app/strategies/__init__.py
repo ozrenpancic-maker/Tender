@@ -1,4 +1,5 @@
 from app.strategies import (
+    derivatives_extremes,
     dip_buy_volume,
     equity_filtered,
     macro_signal_composite,
@@ -39,5 +40,12 @@ GENERIC_STRATEGIES = {
         "decide": macro_signal_composite.decide,
         "needs_aux": [],
         "needs_series": macro_signal_composite.NEEDS_SERIES,
+    },
+    "derivatives_extremes": {
+        "label": derivatives_extremes.LABEL,
+        "default_params": derivatives_extremes.DEFAULT_PARAMS,
+        "decide": derivatives_extremes.decide,
+        "needs_aux": [],
+        "needs_series": derivatives_extremes.NEEDS_SERIES,
     },
 }

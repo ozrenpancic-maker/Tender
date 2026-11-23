@@ -25,3 +25,9 @@ FRED_API_KEY = os.environ.get("FRED_API_KEY", "")
 # Reddit OAuth2 (client credentials) - besplatna registracija aplikacije: reddit.com/prefs/apps
 REDDIT_CLIENT_ID = os.environ.get("REDDIT_CLIENT_ID", "")
 REDDIT_CLIENT_SECRET = os.environ.get("REDDIT_CLIENT_SECRET", "")
+
+# GitHub - opcionalno; bez tokena 60 zahtjeva/sat, s besplatnim Personal Access Tokenom 5000/sat.
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+
+# CryptoPanic - besplatan tier, registracija: cryptopanic.com/developers/api/
+CRYPTOPANIC_API_KEY = os.environ.get("CRYPTOPANIC_API_KEY", "")

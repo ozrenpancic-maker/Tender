@@ -8,6 +8,7 @@ const STRATEGY_COLORS = {
   multi_macro_filter: "#be185d",
   technical_composite: "#0891b2",
   macro_signal_composite: "#ca8a04",
+  derivatives_extremes: "#15803d",
 };
 
 async function api(path, options) {
@@ -231,6 +232,9 @@ const SOURCE_TITLES = {
   reddit: "Reddit sentiment",
   etf_flow: "ETF tokovi",
   regulatory: "Regulativa (SEC/CFTC)",
+  binance_futures: "Binance futures (funding rate)",
+  github: "GitHub aktivnost",
+  cryptopanic: "CryptoPanic vijesti",
 };
 
 async function renderMacroSyncRows() {

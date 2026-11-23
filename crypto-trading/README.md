@@ -54,20 +54,34 @@ Novi besplatni/sivo-područje izvori (dashboard, odjeljak 3; detalji i env varij
 
 | Izvor | Što daje | Cijena | Pouzdanost |
 |---|---|---|---|
-| FRED | Fed stopa, CPI, nezaposlenost, BDP | Besplatno (treba ključ) | Službeni API, visoka |
+| FRED | Fed stopa, CPI, nezaposlenost, BDP, M2 novčana masa, prinosi na obveznice (10Y, realni) | Besplatno (treba ključ) | Službeni API, visoka |
 | DeFiLlama | TVL po chainu (Ethereum, Solana) | Besplatno, bez ključa | Službeni API, visoka |
 | CoinGecko | Implicitna cirkulirajuća ponuda (market cap / cijena) | Besplatno, bez ključa, rate-limited | Službeni API, visoka |
+| Binance futures | Funding rate (BTC/ETH/SOL perpetuali) - povijest godinama unatrag | Besplatno, bez ključa | Službeni API, visoka |
+| GitHub | Broj commitova (razvojna aktivnost) za zadani repo | Besplatno, bez ključa (60/h) ili s PAT (5000/h) | Službeni API, visoka |
 | Google Trends | Interes za pretrage ("bitcoin", "crypto") | Besplatno, neslužbeno (pytrends) | **Niska** - Google često mijenja zaštite, može prestati raditi bez najave |
 | Reddit | Grub leksikonski sentiment (r/Bitcoin, r/CryptoCurrency) | Besplatno (treba app registraciju) | Srednja - leksikon je grub, nije NLP model |
+| CryptoPanic | Stvarni glasovi zajednice (bullish/bearish) po objavi | Besplatno (treba registraciju) | Srednja - API je mijenjao verzije u prošlosti |
 | ETF tokovi | Dnevni neto tok BTC/ETH spot ETF-ova | Besplatno, scraping (farside.co.uk) | **Niska** - HTML scraping, krhko |
 | Regulativa | Leksikonski skor SEC/CFTC RSS objava | Besplatno, RSS | Srednja - leksikon je grub, ne pravna analiza |
 
-**Namjerno izostavljeno** (zahtijeva plaćenu pretplatu koju aplikacija ne pretpostavlja da korisnik
-želi platiti bez pitanja): praćenje "kitova" (Glassnode/Nansen/Whale Alert), on-chain izvedene
-metrike poput MVRV/NVT/SOPR/exchange in-outflow (isti davatelji), i order book dubina/zidovi (javno
-dostupno uživo preko Coinbase websocketa, ali **nema besplatnih povijesnih order book podataka** pa
-se ne bi moglo ni backtestirati, samo uživo promatrati). Ako želiš ovo, javi koji servis planiraš
-platiti pa se dogradi integracija s tim API ključem.
+**Ispravak u odnosu na raniju procjenu**: prije sam praćenje derivata (funding rate, open interest,
+likvidacije) svrstao pod "treba plaćenu pretplatu" zajedno s order book dubinom. To je bilo
+pregrubo - **povijest funding ratea je besplatno dostupna** (Binance Futures javni API, bez ključa,
+godinama unatrag), pa je iskoristiva i za backtest, ne samo uživo promatranje. Dodana je nova
+strategija `derivatives_extremes` (kontrarijanski "short/long squeeze" signal - kupi na ekstremno
+negativan funding, izađi na ekstremno pozitivan) koja to koristi. Open interest je i dalje ograničen
+na zadnjih ~30 dana od strane Binancea (`app/binance_derivatives_client.py:fetch_open_interest`) -
+dovoljno za paper/live uvid, ne za dugi backtest, pa nije uključen u formalni `needs_series` sustav.
+
+**Namjerno izostavljeno** (provjereno ili jaka indikacija da zahtijeva plaćenu pretplatu za API
+pristup, ne samo web sučelje): Glassnode (besplatni tier je u međuvremenu sveden na web grafove, ne
+API), CryptoQuant, IntoTheBlock, Token Terminal, CoinAnk (whale tracking i on-chain izvedene metrike
+poput MVRV/NVT/SOPR/exchange in-outflow), i order book dubina/zidovi (javno dostupno uživo preko
+Coinbase websocketa, ali **nema besplatnih povijesnih order book podataka** pa se ne bi moglo ni
+backtestirati, samo uživo promatrati). Trading Economics ima besplatan tier, ali vrlo ograničen i
+uglavnom se preklapa s FRED-om (koji je pouzdaniji za američke podatke) - nije dodan. Ako želiš
+nešto od ovoga, javi koji servis planiraš platiti pa se dogradi integracija s tim API ključem.
 
 ### Zašto "pronađi profitabilnu strategiju" nije tako jednostavno kako zvuči
 
@@ -143,7 +157,8 @@ razdoblja (2022–2026, po godinama, uključujući medvjeđe tržište 2022.). N
   pomoćne funkcije (`series_value_on_or_before`, `series_change_pct`) za ovaj oblik podataka.
 - **`app/fred_client.py`**, **`app/defillama_client.py`**, **`app/coingecko_client.py`**,
   **`app/trends_client.py`**, **`app/reddit_client.py`**, **`app/etf_client.py`**,
-  **`app/regulatory_client.py`** — po jedan klijent po izvoru, svaki s istim sučeljem
+  **`app/regulatory_client.py`**, **`app/binance_derivatives_client.py`**, **`app/github_client.py`**,
+  **`app/cryptopanic_client.py`** — po jedan klijent po izvoru, svaki s istim sučeljem
   (`fetch_recent`, `sync_to_db`, `test_connection`). `app/macro_clients.py` je registar koji ih
   povezuje po imenu izvora - koristi ga paper/live engine i API rute.
 - **`app/optimizer.py`** — grid search parametara na in-sample razdoblju + provjera top 5 na
@@ -248,3 +263,14 @@ potpunog gubitka uloženih sredstava.
 - `macro_signal_composite` treba sve 4 serije (FRED, Reddit, regulativa, ETF tok) sinkronizirane da
   bi uopće pokrenuo backtest - namjerno strože od "nedostajući glas se ne broji" unutar same odluke
   (to pravilo vrijedi tek kad su serije sinkronizirane, ali pojedini dani unutar njih nedostaju).
+- `derivatives_extremes` je kontrarijanski/reversal signal (kladi se na preokret nakon ekstrema), za
+  razliku od trend-prateećih strategija u ovom projektu - testira drukčiju tezu, nije "poboljšana
+  verzija" nečeg postojećeg. Pragovi ekstrema (`extreme_negative`/`extreme_positive`) su proizvoljno
+  postavljeni početni pokušaji, ne kalibrirani na povijesnu distribuciju funding ratea - koristi
+  optimizator (odjeljak 4) prije vjerovanja bilo kojoj konkretnoj vrijednosti.
+- `github_client.py` prati samo broj commitova, ne i njihovu kvalitetu/veličinu - jedan commit koji
+  mijenja jedan redak broji se jednako kao veliki refactor. Grub proxy za aktivnost, ne za kvalitetu
+  razvoja.
+- CryptoPanic je mijenjao verzije API-ja u prošlosti - ako "Testiraj vezu" ne uspije, prvo provjeri
+  trenutnu dokumentaciju na cryptopanic.com/developers/api/ prije traženja bugova u
+  `app/cryptopanic_client.py`.

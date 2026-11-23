@@ -20,6 +20,9 @@ SERIES = {
     "CPI": "CPIAUCSL",  # Consumer Price Index
     "UNRATE": "UNRATE",  # Nezaposlenost
     "GDP": "GDP",  # Bruto domaći proizvod (kvartalno)
+    "M2": "M2SL",  # M2 novčana masa - globalna likvidnost, poznat dugoročni BTC ciklus faktor
+    "TREASURY_10Y": "DGS10",  # Prinos na 10-godišnje američke obveznice
+    "REAL_YIELD_10Y": "DFII10",  # Realni (inflacijski prilagođen) prinos na 10-godišnje obveznice
 }
 
 
