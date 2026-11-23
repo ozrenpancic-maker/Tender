@@ -5,7 +5,7 @@ vraća odluku: "buy", "sell" ili "hold". Strategije su bez stanja osim onoga št
 proslijedi backtest/paper engine (trenutna pozicija), da bi se identičan kod mogao koristiti i za
 backtest i za paper/live trgovanje.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Literal
 
 from app.candles import Candle
@@ -19,13 +19,7 @@ class StrategyContext:
     index: int  # indeks trenutne (zadnje zatvorene) svijeće u candles
     in_position: bool  # ima li se trenutno otvorena pozicija (kupljeno)
     params: dict
+    aux: dict[str, list[Candle]] = field(default_factory=dict)  # npr. {"SPX": [...]} - vidi app.aux
 
 
 Strategy = Callable[[StrategyContext], Decision]
-
-
-STRATEGY_REGISTRY: dict[str, dict] = {}
-
-
-def register(key: str, label: str, default_params: dict, fn: Strategy) -> None:
-    STRATEGY_REGISTRY[key] = {"label": label, "default_params": default_params, "fn": fn}

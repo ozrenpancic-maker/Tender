@@ -4,7 +4,7 @@ import json
 import threading
 import time
 
-from app import coinbase_client, db
+from app import coinbase_client, db, equity_client
 from app.costs import FEE, buy_fill_price, sell_fill_price
 from app.strategies import GENERIC_STRATEGIES
 from app.strategies.base import StrategyContext
@@ -76,7 +76,15 @@ def _tick(run_id: int) -> None:
             return  # ova dnevna svijeća je već obrađena
 
         strategy = GENERIC_STRATEGIES[strategy_key]
-        ctx = StrategyContext(candles=candles, index=len(candles) - 1, in_position=in_position, params=params)
+        aux = {}
+        for label in strategy.get("needs_aux", []):
+            try:
+                aux[label] = equity_client.fetch_recent_candles(label, days=200)
+            except Exception as err:
+                print(f"[paper_engine] run {run_id}: ne mogu dohvatiti {label} ({err}) - preskačem ovaj tick.")
+                return
+
+        ctx = StrategyContext(candles=candles, index=len(candles) - 1, in_position=in_position, params=params, aux=aux)
         decision = strategy["decide"](ctx)
 
         if decision == "buy" and not in_position:

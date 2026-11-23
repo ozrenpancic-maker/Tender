@@ -21,6 +21,12 @@ na jednom paru u jednom (uglavnom rastućem) tržišnom razdoblju, što je prema
 slučajnost ili da se zaključi da će raditi i ubuduće. Koristi dashboard (odjeljak 1) da testiraš
 više parova, razdoblja i parametara prije nego ičemu vjeruješ.
 
+Dodana je i `equity_filtered` strategija koja uključuje "Wall Street" kontekst: isti SMA presjek,
+ali 'buy' je dopušten samo kad je S&P 500 iznad svog 50-dnevnog prosjeka (risk-on filter) — testira
+ideju da kripto cijene dobrim dijelom prate opće raspoloženje na dioničkom tržištu. Treba
+sinkronizirane S&P 500 podatke (dashboard, odjeljak 2) prije pokretanja backtesta; bez toga baca
+jasnu grešku umjesto da tiho zanemari filter.
+
 ## Arhitektura
 
 - **`data/kripto.sqlite`** — povijesne dnevne/5-min svijeće (Binance, Coin Metrics, uzorci
@@ -32,13 +38,16 @@ više parova, razdoblja i parametara prije nego ičemu vjeruješ.
   `(context) -> "buy"/"sell"/"hold"`, pa se identičan kod koristi i za backtest i za paper/live.
 - **`app/coinbase_client.py`** — javni cjenovni feed (bez ključa) i autenticirani Advanced Trade
   API klijent (CDP API ključ, ES256 JWT).
+- **`app/equity_client.py`** — dnevni podaci za S&P 500 / Dow / Nasdaq sa Stooq-a (javno, bez
+  ključa), za makro-filter strategije. `app/aux.py` poravnava kripto (trguje se 7 dana u tjednu) i
+  equity (zatvoreno vikendom) kalendare uzimanjem zadnje poznate equity cijene na/prije danog dana.
 - **`app/paper_engine.py`** — pozadinska nit po pokrenutom runu, svakih 5 min provjerava je li
   stigla nova zatvorena dnevna svijeća, simulira trgovinu po živoj cijeni (isti troškovni model kao
   backtest), stanje uvijek rekonstruira iz zabilježenih trgovina (preživi restart servera).
 - **`app/live_engine.py`** — identična logika, ali šalje prave naloge. Vidi sigurnosne mehanizme
   ispod.
 - **`static/`** — dashboard (čisti HTML/CSS/JS, bez vanjskih ovisnosti, radi i bez interneta osim
-  za Coinbase pozive).
+  za Coinbase/Stooq pozive).
 
 ## Pokretanje
 
@@ -58,13 +67,17 @@ Backtest engine je testiran tako da `baseline_2pct` na BTC/EUR, 2024-01-01 do 20
 **točno** isti rezultat kao priloženi izvještaj (165 trgovina, 47 profitabilnih, 108,41 € završni
 saldo, 79,11% maksimalni pad) — vidi `rezultat_testa.json` u izvorno priloženom paketu. Ovo
 potvrđuje da čitanje podataka i troškovni model (0,1% slippage + 0,4% naknada po strani) rade
-ispravno prije nego im se vjeruje za nove strategije.
+ispravno prije nego im se vjeruje za nove strategije. `equity_filtered` je dodatno provjeren
+umetanjem sintetičkih S&P 500 podataka izravno u bazu (zaobilazeći mrežni poziv) kako bi se
+potvrdilo da se aux podaci ispravno povlače i koriste u odluci te da nedostajući podaci bacaju
+jasnu grešku umjesto tihog zanemarivanja filtra.
 
-**Coinbase integracija (javni feed, autenticirani pozivi, format naloga) NIJE uživo testirana** —
-ovo razvojno okruženje nema izlazni pristup internetu prema Coinbaseu. Prije stvarnog korištenja:
+**Coinbase i Stooq integracije (javni feed, autenticirani pozivi, format naloga/CSV-a) NISU uživo
+testirane** — ovo razvojno okruženje nema izlazni pristup internetu. Prije stvarnog korištenja:
 1. Pokreni server negdje s normalnim internet pristupom.
-2. Klikni "Testiraj vezu" (odjeljak 2 dashboarda) — ako javi grešku, popravak je izoliran u
-   `app/coinbase_client.py` (endpoint, JWT format, nazivi polja u odgovoru).
+2. Klikni "Testiraj vezu" u oba odjeljka (Wall Street i Coinbase) — ako jave grešku, popravak je
+   izoliran u `app/coinbase_client.py` odnosno `app/equity_client.py` (endpoint, format odgovora,
+   simboli poput `^spx`/`^dji`/`^ndq`).
 3. Pokreni paper trading i prati barem nekoliko dana/tjedana prije nego razmišljaš o live modu.
 
 ## Sigurnosni mehanizmi za live trgovanje
@@ -101,3 +114,9 @@ potpunog gubitka uloženih sredstava.
   pokaže da polje ne postoji, `LIVE_DAILY_LOSS_LIMIT_EUR` provjera će (namjerno, fail-safe)
   zaustaviti run umjesto da ga tiho zaobiđe; svejedno provjeri `app/live_engine.py` prvom prilikom
   s pravim pristupom.
+- "Wall Street" podaci pokrivaju samo tri indeksa (S&P 500, Dow, Nasdaq) preko Stooq-a, dnevna
+  rezolucija. Stooq simboli (`^spx`, `^dji`, `^ndq`) nisu uživo potvrđeni - ako "Testiraj vezu" javi
+  grešku za neki indeks, ispravi simbol u `app/equity_client.py` (`INDEX_SYMBOLS`).
+- Korelacija kripta/dioničko tržište koju `equity_filtered` pokušava iskoristiti je poznata
+  pojava zadnjih godina, ali nije fizikalni zakon - može oslabiti ili nestati. Backtestiraj je na
+  više razdoblja prije nego joj vjeruješ.

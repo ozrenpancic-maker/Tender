@@ -14,7 +14,7 @@ import json
 import threading
 import time
 
-from app import coinbase_client, config, db
+from app import coinbase_client, config, db, equity_client
 from app.strategies import GENERIC_STRATEGIES
 from app.strategies.base import StrategyContext
 
@@ -116,7 +116,15 @@ def _tick(run_id: int) -> None:
 
         position, in_position = _position_from_orders(conn, run_id)
         strategy = GENERIC_STRATEGIES[strategy_key]
-        ctx = StrategyContext(candles=candles, index=len(candles) - 1, in_position=in_position, params=params)
+        aux = {}
+        for label in strategy.get("needs_aux", []):
+            try:
+                aux[label] = equity_client.fetch_recent_candles(label, days=200)
+            except Exception as err:
+                print(f"[live_engine] run {run_id}: ne mogu dohvatiti {label} ({err}) - preskačem ovaj tick (nema trgovanja bez makro podatka).")
+                return
+
+        ctx = StrategyContext(candles=candles, index=len(candles) - 1, in_position=in_position, params=params, aux=aux)
         decision = strategy["decide"](ctx)
 
         loss_limit_breached = _daily_loss_limit_breached(conn, run_id)

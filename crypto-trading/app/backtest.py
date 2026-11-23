@@ -7,10 +7,11 @@ from app.strategies.base import StrategyContext
 from app.strategies.baseline_2pct import run_baseline
 
 
-def run_generic_backtest(candles: list[Candle], strategy_key: str, params: dict, starting_balance: float) -> dict:
+def run_generic_backtest(candles: list[Candle], strategy_key: str, params: dict, starting_balance: float, aux: dict | None = None) -> dict:
     strategy = GENERIC_STRATEGIES[strategy_key]
     decide = strategy["decide"]
     params = {**strategy["default_params"], **params}
+    aux = aux or {}
 
     cash = starting_balance
     position_base = 0.0
@@ -23,7 +24,7 @@ def run_generic_backtest(candles: list[Candle], strategy_key: str, params: dict,
     equity_curve = []
 
     for i in range(len(candles) - 1):
-        ctx = StrategyContext(candles=candles, index=i, in_position=in_position, params=params)
+        ctx = StrategyContext(candles=candles, index=i, in_position=in_position, params=params, aux=aux)
         decision = decide(ctx)
         next_candle = candles[i + 1]
 
@@ -106,4 +107,14 @@ def run_backtest(conn, strategy_key: str, pair: str, start_ts: int, end_ts: int,
     if strategy_key not in GENERIC_STRATEGIES:
         raise ValueError(f"Nepoznata strategija: {strategy_key}")
 
-    return run_generic_backtest(candles, strategy_key, params, starting_balance)
+    aux = {}
+    for label in GENERIC_STRATEGIES[strategy_key].get("needs_aux", []):
+        aux_candles = load_candles(conn, "stooq", label, 1440, start_ts - 90 * 86400, end_ts)
+        if not aux_candles:
+            raise ValueError(
+                f"Strategija '{strategy_key}' treba podatke za {label}, a nisu sinkronizirani. "
+                f"Pokreni sync na dashboardu (odjeljak Wall Street) prvo."
+            )
+        aux[label] = aux_candles
+
+    return run_generic_backtest(candles, strategy_key, params, starting_balance, aux)

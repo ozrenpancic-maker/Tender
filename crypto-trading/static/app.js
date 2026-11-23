@@ -4,6 +4,7 @@ const STRATEGY_COLORS = {
   sma_crossover: "#2f5fdb",
   rsi_meanrev: "#059669",
   dip_buy_volume: "#d97706",
+  equity_filtered: "#7c3aed",
 };
 
 async function api(path, options) {
@@ -179,6 +180,37 @@ function renderBacktestChart(results) {
     legendX += ctx.measureText(label).width + 36;
   }
 }
+
+// ---------- Wall Street / equity ----------
+
+document.getElementById("eqTest").addEventListener("click", async () => {
+  const el = document.getElementById("eqResult");
+  el.textContent = "Testiram…";
+  try {
+    const r = await api("/api/equity/test-connection");
+    el.innerHTML = Object.entries(r)
+      .map(([label, s]) => `<p><span class="pill ${s.ok ? "ok" : "fail"}">${label}</span> ${s.message}</p>`)
+      .join("");
+  } catch (err) {
+    el.textContent = "Greška: " + err.message;
+  }
+});
+
+document.getElementById("eqSyncAll").addEventListener("click", async () => {
+  const el = document.getElementById("eqResult");
+  el.textContent = "Sinkroniziram…";
+  const { labels } = await api("/api/equity/labels");
+  const lines = [];
+  for (const label of labels) {
+    try {
+      const r = await api(`/api/equity/sync/${label}`, { method: "POST" });
+      lines.push(`<p><span class="pill ok">${label}</span> ${r.rows} redaka sinkronizirano.</p>`);
+    } catch (err) {
+      lines.push(`<p><span class="pill fail">${label}</span> ${err.message}</p>`);
+    }
+  }
+  el.innerHTML = lines.join("");
+});
 
 // ---------- Coinbase ----------
 

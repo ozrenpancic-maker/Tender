@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app import coinbase_client, config, db, live_engine, paper_engine
+from app import coinbase_client, config, db, equity_client, live_engine, paper_engine
 from app.backtest import run_backtest
 from app.candles import available_pairs
 from app.strategies import GENERIC_STRATEGIES
@@ -35,7 +35,15 @@ def list_strategies():
         },
     ]
     for key, s in GENERIC_STRATEGIES.items():
-        items.append({"key": key, "label": s["label"], "default_params": s["default_params"], "backtest_only": False})
+        items.append(
+            {
+                "key": key,
+                "label": s["label"],
+                "default_params": s["default_params"],
+                "backtest_only": False,
+                "needs_aux": s.get("needs_aux", []),
+            }
+        )
     return {"strategies": items}
 
 
@@ -81,6 +89,32 @@ def backtest(req: BacktestRequest):
         raise HTTPException(400, str(err))
     finally:
         conn.close()
+
+
+# ---------- Wall Street / equity indeksi ----------
+
+@app.get("/api/equity/test-connection")
+def equity_test_connection():
+    return equity_client.test_connection()
+
+
+@app.post("/api/equity/sync/{label}")
+def equity_sync(label: str):
+    if label not in equity_client.INDEX_SYMBOLS:
+        raise HTTPException(400, f"Nepoznata oznaka '{label}'. Dostupno: {list(equity_client.INDEX_SYMBOLS)}")
+    conn = db.get_connection()
+    try:
+        count = equity_client.sync_to_db(conn, label)
+        return {"label": label, "rows": count}
+    except equity_client.EquityError as err:
+        raise HTTPException(502, str(err))
+    finally:
+        conn.close()
+
+
+@app.get("/api/equity/labels")
+def equity_labels():
+    return {"labels": list(equity_client.INDEX_SYMBOLS)}
 
 
 # ---------- Coinbase ----------
