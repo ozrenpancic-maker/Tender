@@ -417,10 +417,7 @@ document.getElementById("cbTest").addEventListener("click", async () => {
   el.textContent = "Testiram…";
   try {
     const r = await api("/api/coinbase/test-connection");
-    el.innerHTML = `
-      <p><span class="pill ${r.public_feed.ok ? "ok" : "fail"}">Javni feed</span> ${r.public_feed.message}</p>
-      <p><span class="pill ${r.authenticated.ok ? "ok" : "fail"}">Autenticirano</span> ${r.authenticated.message}</p>
-    `;
+    el.innerHTML = `<p><span class="pill ${r.public_feed.ok ? "ok" : "fail"}">Javni feed</span> ${r.public_feed.message}</p>`;
   } catch (err) {
     el.textContent = "Greška: " + err.message;
   }
