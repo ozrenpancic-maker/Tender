@@ -70,29 +70,82 @@
   </section>
 
   <section>
-    <h2>2. Wall Street podaci (S&amp;P 500, Dow, Nasdaq)</h2>
+    <h2>2. Wall Street i zlato (S&amp;P 500, Dow, Nasdaq, zlato)</h2>
     <p class="muted">
-      Dnevni podaci s javnog Stooq izvora, bez ključa. Strategija "SMA presjek + S&amp;P 500 risk-on filter"
-      (odjeljak 1) koristi ovo kao filter — kupuje kripto signal samo kad je S&amp;P 500 iznad svog 50-dnevnog
-      prosjeka. Korelacija kripta s dioničkim tržištem nije zajamčena da će se nastaviti — ovo je alat za
-      testiranje te ideje, ne potvrđena strategija.
+      Dnevni podaci s javnog Stooq izvora, bez ključa. Strategije s makro filterom (odjeljak 1) koriste ovo da
+      kripto signal propuste samo kad je makro okruženje "risk-on". Korelacija kripta s dioničkim tržištem/zlatom
+      nije zajamčena da će se nastaviti — ovo je alat za testiranje te ideje, ne potvrđena strategija.
     </p>
     <div class="row">
       <button class="secondary" id="eqTest">Testiraj vezu</button>
-      <button id="eqSyncAll">Sinkroniziraj sve (SPX, DJI, NDQ)</button>
+      <button id="eqSyncAll">Sinkroniziraj sve (SPX, DJI, NDQ, GOLD)</button>
     </div>
     <div id="eqResult" style="margin-top:12px"></div>
   </section>
 
   <section>
-    <h2>3. Coinbase veza</h2>
+    <h2>3. Optimizacija parametara (in-sample / out-of-sample)</h2>
+    <p class="muted">
+      Pretražuje kombinacije parametara na "in-sample" razdoblju i rangira ih po rezultatu, zatim
+      par najboljih provjerava na "out-of-sample" razdoblju koje optimizacija nije vidjela.
+      <strong>Vjeruj samo kombinacijama koje rade dobro na OBA razdoblja</strong> — nešto što radi
+      sjajno samo na in-sample a loše na out-of-sample je gotovo sigurno slučajnost (curve fitting),
+      ne stvarna prednost. Čak i uspjeh na oba razdoblja nije jamstvo za budućnost.
+    </p>
+    <div class="row">
+      <div class="field">
+        <label>Strategija</label>
+        <select id="optStrategy"></select>
+      </div>
+      <div class="field">
+        <label>Par</label>
+        <select id="optPair"></select>
+      </div>
+      <div class="field">
+        <label>Početna sredstva (EUR)</label>
+        <input type="number" id="optBalance" value="500" />
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div class="field">
+        <label>In-sample od</label>
+        <input type="date" id="optInStart" value="2024-01-01" />
+      </div>
+      <div class="field">
+        <label>In-sample do</label>
+        <input type="date" id="optInEnd" value="2025-12-31" />
+      </div>
+      <div class="field">
+        <label>Out-of-sample od</label>
+        <input type="date" id="optOutStart" value="2026-01-01" />
+      </div>
+      <div class="field">
+        <label>Out-of-sample do</label>
+        <input type="date" id="optOutEnd" value="2026-11-21" />
+      </div>
+      <button id="optRun">Pokreni optimizaciju</button>
+    </div>
+    <p id="optStatus" class="muted" style="display:none"></p>
+    <table id="optTable" style="display:none">
+      <thead>
+        <tr>
+          <th>Parametri</th><th>In-sample saldo</th><th>In-sample pad</th>
+          <th>Out-of-sample saldo</th><th>Out-of-sample pad</th><th>Ocjena</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>4. Coinbase veza</h2>
     <p class="muted">Javni cjenovni feed ne treba ključ. Autenticirani dio (stanje računa, slanje naloga) treba API ključ u .env — vidi README.</p>
     <button id="cbTest">Testiraj vezu</button>
     <div id="cbResult" style="margin-top:12px"></div>
   </section>
 
   <section>
-    <h2>4. Paper trading (simulacija na živim cijenama, bez pravog novca)</h2>
+    <h2>5. Paper trading (simulacija na živim cijenama, bez pravog novca)</h2>
     <div class="row">
       <div class="field">
         <label>Strategija</label>
@@ -118,7 +171,7 @@
   </section>
 
   <section>
-    <h2>5. Live trgovanje (pravi novac)</h2>
+    <h2>6. Live trgovanje (pravi novac)</h2>
     <div id="liveDetailBanner"></div>
     <div class="row" id="liveStartForm" style="display:none">
       <div class="field">

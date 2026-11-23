@@ -21,11 +21,26 @@ na jednom paru u jednom (uglavnom rastućem) tržišnom razdoblju, što je prema
 slučajnost ili da se zaključi da će raditi i ubuduće. Koristi dashboard (odjeljak 1) da testiraš
 više parova, razdoblja i parametara prije nego ičemu vjeruješ.
 
-Dodana je i `equity_filtered` strategija koja uključuje "Wall Street" kontekst: isti SMA presjek,
-ali 'buy' je dopušten samo kad je S&P 500 iznad svog 50-dnevnog prosjeka (risk-on filter) — testira
-ideju da kripto cijene dobrim dijelom prate opće raspoloženje na dioničkom tržištu. Treba
-sinkronizirane S&P 500 podatke (dashboard, odjeljak 2) prije pokretanja backtesta; bez toga baca
-jasnu grešku umjesto da tiho zanemari filter.
+Dodane su i dvije strategije s makro kontekstom: `equity_filtered` (isti SMA presjek, ali 'buy' je
+dopušten samo kad je S&P 500 iznad svog 50-dnevnog prosjeka) i `multi_macro_filter` (isto, plus
+zahtijeva da zlato NIJE u naglom skoku - tipičan znak "bijega u sigurnost"/risk-off raspoloženja).
+Obje testiraju ideju da kripto cijene dobrim dijelom prate opće tržišno raspoloženje. Trebaju
+sinkronizirane S&P 500 / zlato podatke (dashboard, odjeljak 2) prije pokretanja backtesta; bez toga
+bacaju jasnu grešku umjesto da tiho zanemare filter.
+
+### Zašto "pronađi profitabilnu strategiju" nije tako jednostavno kako zvuči
+
+Dodan je **optimizator s in-sample/out-of-sample provjerom** (dashboard, odjeljak 3; `app/optimizer.py`)
+jer je ručno biranje parametara dok rezultat na JEDNOM razdoblju ne izgleda dobro klasičan "curve
+fitting" - gotovo uvijek postoji neka kombinacija koja na papiru izgleda sjajno čistom slučajnošću.
+Konkretan primjer iz ovog projekta: `sma_crossover` optimiziran na 2024–2025 (in-sample) daje
+odlične rezultate (npr. fast=10/slow=20: 500 € → 837 €), ali ISTI parametri na 2026. (out-of-sample,
+podaci koje optimizacija nije vidjela) daju 500 € → **480 €**, tj. gubitak. Od 5 najboljih in-sample
+kombinacija, nijedna nije ponovila uspjeh izvan uzorka - sve su ili izgubile novac ili jedva ostale u
+plusu. Ovo nije propust u kodu, nego iskren i očekivan rezultat: **dosad testirane kombinacije na
+ovom paru/razdoblju nisu pokazale pouzdanu prednost koja preživljava izvan uzorka na kojem je
+pronađena.** Prije nego se bilo čemu ovdje vjeruje s pravim novcem, treba naći kombinaciju koja
+radi dobro na OBA razdoblja (dashboard to jasno označava), i dalje uz svijest da ni to nije jamstvo.
 
 ## Arhitektura
 
@@ -38,9 +53,11 @@ jasnu grešku umjesto da tiho zanemari filter.
   `(context) -> "buy"/"sell"/"hold"`, pa se identičan kod koristi i za backtest i za paper/live.
 - **`app/coinbase_client.py`** — javni cjenovni feed (bez ključa) i autenticirani Advanced Trade
   API klijent (CDP API ključ, ES256 JWT).
-- **`app/equity_client.py`** — dnevni podaci za S&P 500 / Dow / Nasdaq sa Stooq-a (javno, bez
-  ključa), za makro-filter strategije. `app/aux.py` poravnava kripto (trguje se 7 dana u tjednu) i
-  equity (zatvoreno vikendom) kalendare uzimanjem zadnje poznate equity cijene na/prije danog dana.
+- **`app/equity_client.py`** — dnevni podaci za S&P 500 / Dow / Nasdaq / zlato sa Stooq-a (javno,
+  bez ključa), za makro-filter strategije. `app/aux.py` poravnava kripto (trguje se 7 dana u tjednu)
+  i equity/zlato (zatvoreno vikendom) kalendare uzimanjem zadnje poznate cijene na/prije danog dana.
+- **`app/optimizer.py`** — grid search parametara na in-sample razdoblju + provjera top 5 na
+  out-of-sample razdoblju, radi smanjenja (ne eliminacije) rizika od curve fittinga.
 - **`app/paper_engine.py`** — pozadinska nit po pokrenutom runu, svakih 5 min provjerava je li
   stigla nova zatvorena dnevna svijeća, simulira trgovinu po živoj cijeni (isti troškovni model kao
   backtest), stanje uvijek rekonstruira iz zabilježenih trgovina (preživi restart servera).
@@ -114,9 +131,15 @@ potpunog gubitka uloženih sredstava.
   pokaže da polje ne postoji, `LIVE_DAILY_LOSS_LIMIT_EUR` provjera će (namjerno, fail-safe)
   zaustaviti run umjesto da ga tiho zaobiđe; svejedno provjeri `app/live_engine.py` prvom prilikom
   s pravim pristupom.
-- "Wall Street" podaci pokrivaju samo tri indeksa (S&P 500, Dow, Nasdaq) preko Stooq-a, dnevna
-  rezolucija. Stooq simboli (`^spx`, `^dji`, `^ndq`) nisu uživo potvrđeni - ako "Testiraj vezu" javi
-  grešku za neki indeks, ispravi simbol u `app/equity_client.py` (`INDEX_SYMBOLS`).
-- Korelacija kripta/dioničko tržište koju `equity_filtered` pokušava iskoristiti je poznata
-  pojava zadnjih godina, ali nije fizikalni zakon - može oslabiti ili nestati. Backtestiraj je na
-  više razdoblja prije nego joj vjeruješ.
+- "Wall Street"/zlato podaci pokrivaju tri indeksa i zlato preko Stooq-a, dnevna rezolucija. Stooq
+  simboli (`^spx`, `^dji`, `^ndq`, `xauusd`) nisu uživo potvrđeni - ako "Testiraj vezu" javi grešku
+  za neki od njih, ispravi simbol u `app/equity_client.py` (`INDEX_SYMBOLS`).
+- Korelacija kripta/dioničko tržište/zlato koju `equity_filtered` i `multi_macro_filter` pokušavaju
+  iskoristiti je poznata pojava zadnjih godina, ali nije fizikalni zakon - može oslabiti ili nestati.
+- Optimizator pretražuje unaprijed zadane mreže parametara (`app/optimizer.py`, `DEFAULT_GRIDS`) -
+  ne jamči da je pronašao globalno najbolju kombinaciju, samo najbolju unutar te mreže. Ograničen je
+  na 400 kombinacija po pozivu (`MAX_COMBINATIONS`) radi razumnog vremena izvršavanja.
+- Ni uspjeh na in-sample I out-of-sample razdoblju nije jamstvo budućeg profita - to je dva uzorka,
+  ne beskonačno mnogo. Market režimi se mijenjaju; strategija provjerena na 2024–2026. ne mora raditi
+  jednako u drugačijem tržišnom okruženju (npr. dugotrajni medvjeđi trend, nagla promjena kamatnih
+  stopa, regulatorni šok).

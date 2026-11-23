@@ -1,4 +1,4 @@
-from app.strategies import dip_buy_volume, equity_filtered, rsi_meanrev, sma_crossover
+from app.strategies import dip_buy_volume, equity_filtered, multi_macro_filter, rsi_meanrev, sma_crossover
 
 GENERIC_STRATEGIES = {
     "sma_crossover": {"label": sma_crossover.LABEL, "default_params": sma_crossover.DEFAULT_PARAMS, "decide": sma_crossover.decide, "needs_aux": []},
@@ -9,5 +9,11 @@ GENERIC_STRATEGIES = {
         "default_params": equity_filtered.DEFAULT_PARAMS,
         "decide": equity_filtered.decide,
         "needs_aux": equity_filtered.NEEDS_AUX,
+    },
+    "multi_macro_filter": {
+        "label": multi_macro_filter.LABEL,
+        "default_params": multi_macro_filter.DEFAULT_PARAMS,
+        "decide": multi_macro_filter.decide,
+        "needs_aux": multi_macro_filter.NEEDS_AUX,
     },
 }

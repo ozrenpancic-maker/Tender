@@ -35,13 +35,18 @@ async function init() {
   fillSelect("btPair", pairs);
   fillSelect("ppPair", pairs.filter((p) => p !== "BTC/EUR" || true));
   fillSelect("lvPair", pairs);
+  fillSelect("optPair", pairs);
   fillSelect(
     "btStrategy",
     strategies.map((s) => s.key),
     strategies.reduce((acc, s) => ({ ...acc, [s.key]: s.label }), {}),
   );
-
   const tradable = strategies.filter((s) => !s.backtest_only);
+  fillSelect(
+    "optStrategy",
+    tradable.map((s) => s.key),
+    tradable.reduce((acc, s) => ({ ...acc, [s.key]: s.label }), {}),
+  );
   fillSelect(
     "ppStrategy",
     tradable.map((s) => s.key),
@@ -211,6 +216,71 @@ document.getElementById("eqSyncAll").addEventListener("click", async () => {
   }
   el.innerHTML = lines.join("");
 });
+
+// ---------- Optimizacija ----------
+
+document.getElementById("optRun").addEventListener("click", async () => {
+  const statusEl = document.getElementById("optStatus");
+  const table = document.getElementById("optTable");
+  statusEl.style.display = "block";
+  statusEl.textContent = "Pretražujem kombinacije parametara…";
+  table.style.display = "none";
+
+  const body = {
+    strategy: document.getElementById("optStrategy").value,
+    pair: document.getElementById("optPair").value,
+    starting_balance: Number(document.getElementById("optBalance").value),
+    in_start_date: document.getElementById("optInStart").value,
+    in_end_date: document.getElementById("optInEnd").value,
+    out_start_date: document.getElementById("optOutStart").value,
+    out_end_date: document.getElementById("optOutEnd").value,
+  };
+
+  try {
+    const r = await api("/api/optimize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    statusEl.textContent = `Testirano ${r.combinations_tested} kombinacija (${r.combinations_with_result} dalo rezultat). Prikazano top ${r.top_with_out_of_sample.length} s out-of-sample provjerom.`;
+    renderOptTable(r, body.starting_balance);
+  } catch (err) {
+    statusEl.textContent = "Greška: " + err.message;
+  }
+});
+
+function renderOptTable(result, startingBalance) {
+  const table = document.getElementById("optTable");
+  const tbody = table.querySelector("tbody");
+  tbody.innerHTML = "";
+
+  for (const entry of result.top_with_out_of_sample) {
+    const inOk = entry.in_sample.final_balance > startingBalance;
+    const outOk = entry.out_of_sample && entry.out_of_sample.final_balance > startingBalance;
+    let verdict, cls;
+    if (inOk && outOk) {
+      verdict = "✅ Profitabilno na oba razdoblja";
+      cls = "best";
+    } else if (inOk && !outOk) {
+      verdict = "⚠️ Samo in-sample — vjerojatno curve fitting";
+      cls = "worst";
+    } else {
+      verdict = "❌ Gubi na in-sample";
+      cls = "worst";
+    }
+
+    const tr = document.createElement("tr");
+    tr.className = cls;
+    const outCell = entry.out_of_sample
+      ? `<td>${fmtEur(entry.out_of_sample.final_balance)}</td><td>${fmtPct(entry.out_of_sample.max_drawdown_pct)}</td>`
+      : `<td colspan="2">${entry.out_of_sample_error || "nema podataka"}</td>`;
+    tr.innerHTML = `<td><code>${JSON.stringify(entry.params)}</code></td>
+      <td>${fmtEur(entry.in_sample.final_balance)}</td><td>${fmtPct(entry.in_sample.max_drawdown_pct)}</td>
+      ${outCell}<td>${verdict}</td>`;
+    tbody.appendChild(tr);
+  }
+  table.style.display = "table";
+}
 
 // ---------- Coinbase ----------
 

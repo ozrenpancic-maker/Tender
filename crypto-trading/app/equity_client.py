@@ -1,9 +1,10 @@
-"""Dnevni podaci za glavne američke dioničke indekse ('Wall Street'), radi testiranja koristi li
-makro trend (risk-on/risk-off) kao filter za kripto strategije.
+"""Dnevni podaci za glavne američke dioničke indekse ('Wall Street') i cijenu zlata, radi testiranja
+koristi li makro trend (risk-on/risk-off, "safe haven" potražnja za zlatom) kao filter za kripto
+strategije.
 
 NAPOMENA O POUZDANOSTI (isti princip kao kod TED/EOJN/Coinbase providera): izvor je Stooq-ov javni
-CSV izvoz (stooq.com/q/d/l/), koji ne treba API ključ. Endpoint i simboli (^spx, ^dji, ^ndq) su
-napisani prema poznatoj javnoj upotrebi Stooq-a u trenutku pisanja koda, ali NISU uživo testirani
+CSV izvoz (stooq.com/q/d/l/), koji ne treba API ključ. Endpoint i simboli (^spx, ^dji, ^ndq, xauusd)
+su napisani prema poznatoj javnoj upotrebi Stooq-a u trenutku pisanja koda, ali NISU uživo testirani
 jer ovo razvojno okruženje nema izlazni pristup internetu. Pokreni "Testiraj vezu" na dashboardu
 (odjeljak Wall Street) iz okoline s internet pristupom prije nego se osloniš na ovaj podatak -
 popravak simbola/formata je izoliran u ovoj datoteci.
@@ -24,6 +25,7 @@ INDEX_SYMBOLS = {
     "SPX": "^spx",  # S&P 500
     "DJI": "^dji",  # Dow Jones Industrial Average
     "NDQ": "^ndq",  # Nasdaq Composite
+    "GOLD": "xauusd",  # Zlato, spot USD/unca
 }
 
 

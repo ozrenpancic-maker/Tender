@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from app import coinbase_client, config, db, equity_client, live_engine, paper_engine
 from app.backtest import run_backtest
 from app.candles import available_pairs
+from app.optimizer import DEFAULT_GRIDS, optimize
 from app.strategies import GENERIC_STRATEGIES
 
 app = FastAPI(title="Kripto trgovanje - istraživački MVP")
@@ -85,6 +86,55 @@ def backtest(req: BacktestRequest):
         )
         conn.commit()
         return result
+    except ValueError as err:
+        raise HTTPException(400, str(err))
+    finally:
+        conn.close()
+
+
+# ---------- Optimizacija (in-sample / out-of-sample) ----------
+
+class OptimizeRequest(BaseModel):
+    strategy: str
+    pair: str
+    in_start_date: str
+    in_end_date: str
+    out_start_date: str
+    out_end_date: str
+    starting_balance: float = 500.0
+    param_grid: dict | None = None
+
+
+def _to_ts(date_str: str) -> int:
+    return int(datetime.datetime.fromisoformat(date_str).replace(tzinfo=datetime.timezone.utc).timestamp())
+
+
+@app.get("/api/optimize/default-grid/{strategy}")
+def optimize_default_grid(strategy: str):
+    grid = DEFAULT_GRIDS.get(strategy)
+    if grid is None:
+        raise HTTPException(404, f"Nema zadane mreže parametara za '{strategy}'.")
+    return {"strategy": strategy, "param_grid": grid}
+
+
+@app.post("/api/optimize")
+def run_optimize(req: OptimizeRequest):
+    try:
+        in_start, in_end = _to_ts(req.in_start_date), _to_ts(req.in_end_date)
+        out_start, out_end = _to_ts(req.out_start_date), _to_ts(req.out_end_date)
+    except ValueError as err:
+        raise HTTPException(400, f"Neispravan datum: {err}")
+
+    if out_start < in_end:
+        raise HTTPException(
+            400,
+            "Out-of-sample razdoblje mora početi nakon kraja in-sample razdoblja - inače optimizacija "
+            "'vidi' podatke na kojima se naknadno provjerava, što rezultat čini beskorisnim.",
+        )
+
+    conn = db.get_connection()
+    try:
+        return optimize(conn, req.strategy, req.pair, in_start, in_end, out_start, out_end, req.starting_balance, req.param_grid)
     except ValueError as err:
         raise HTTPException(400, str(err))
     finally:
