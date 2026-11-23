@@ -5,6 +5,30 @@ Coinbaseu. Nastala je na temelju istraživačkog paketa korisnika (SQLite baza p
 backtest alat, vidi `data/`) i proširena na: usporedbu više strategija, paper trading na živim
 cijenama, i (isključeno po defaultu) slanje pravih naloga.
 
+## Analiza konkretnog portfelja (XRP, SUI, PEPE, DOGE...)
+
+Korisnik je podijelio stvarni Binance portfolio: ~$288 ukupno, gotovo sve pozicije duboko u minusu
+(XRP -70%, SUI -85%, PEPE -79%, DOGE -85%, POL -92%, ALGO -95%, AMP -99%...). Zatraženo je da se
+pokuša aktivno oporaviti kroz trgovanje, ali bez automatskog spajanja na pravi Binance račun za
+sada - samo analiza/backtest.
+
+**Bitno iskreno upozorenje**: ništa u ovoj aplikaciji ne može obećati "veliki profit kroz vrijeme"
+od portfelja koji je ovoliko u minusu - to bi bilo prazno obećanje. `app/binance_history_client.py`
+dodaje mogućnost dohvaćanja povijesti za BAŠ te coinove (izvorna baza je imala samo BTC/ETH/SOL),
+da bi se strategije mogle pošteno testirati na njima umjesto nagađanja. Čim se sinkroniziraju
+(dashboard, odjeljak 1), odmah su dostupni u backtestu/optimizatoru (odjeljci 2 i 5) jer koriste
+isti `candle` format - ništa se drugo ne mijenja u kodu.
+
+Napomene specifične za ove coinove:
+- PEPE i SUI su mladi (2023.) - mnogo kraća povijest za testiranje znači manje statističke snage;
+  bilo koji "dobar" rezultat na njima treba gledati sa znatno više skepse nego na BTC/ETH.
+- "Dust" pozicije (SOL $0.03, ETH $0.01, AMP, JASMY - ispod par centi u ovom portfelju) namjerno
+  nisu uključene u popis za automatski sync - trgovanje njima bi izgubilo više na naknadama
+  (0,4% + 0,1% slippage po strani, vidi `app/costs.py`) nego što sama pozicija vrijedi.
+- POL je Binance simbol nakon Polygon rebranda (bivši MATIC) - ako "Testiraj vezu" javi grešku za
+  njega, Binance možda još uvijek koristi stari simbol za taj par, provjeri i ispravi u
+  `PORTFOLIO_PAIRS`.
+
 ## Ključni nalaz od kojeg se kreće
 
 Priloženi istraživački paket sadržavao je jedno testirano pravilo (kupi na dnevni signal rasta od
@@ -150,6 +174,9 @@ razdoblja (2022–2026, po godinama, uključujući medvjeđe tržište 2022.). N
 - **`app/equity_client.py`** — dnevni podaci za S&P 500 / Dow / Nasdaq / zlato sa Stooq-a (javno,
   bez ključa), za makro-filter strategije. `app/aux.py` poravnava kripto (trguje se 7 dana u tjednu)
   i equity/zlato (zatvoreno vikendom) kalendare uzimanjem zadnje poznate cijene na/prije danog dana.
+- **`app/binance_history_client.py`** — dnevna povijest cijena za proizvoljan Binance par (npr. iz
+  tvog portfelja), izravno u `candle` tablicu (source_id='binance') - isti oblik kao izvorni
+  podaci, pa odmah radi sa svim postojećim strategijama/backtestom/optimizatorom.
 - **`app/indicators.py`** — čiste funkcije za EMA, MACD, Stochastic RSI, ROC, OBV, ATR, Bollinger
   Bands - bez vanjskih poziva, koriste ih `technical_composite` i `macro_signal_composite`.
 - **`app/macro_store.py`** + `macro_series` tablica — generička pohrana ne-OHLC serija (jedna
@@ -303,3 +330,10 @@ potpunog gubitka uloženih sredstava.
 - CryptoPanic je mijenjao verzije API-ja u prošlosti - ako "Testiraj vezu" ne uspije, prvo provjeri
   trenutnu dokumentaciju na cryptopanic.com/developers/api/ prije traženja bugova u
   `app/cryptopanic_client.py`.
+- `binance_history_client.py` sinkronizira cijelu dostupnu povijest pri svakom pozivu (nema
+  inkrementalnog "samo nove podatke" moda) - za coinove s dugom poviješću (DOGE postoji od 2019.)
+  prvi sync može potrajati zbog straniciranja Binance API-ja (max 1000 svijeća po pozivu).
+- Rezultat backtesta/optimizatora na tvojim konkretnim coinovima (odjeljak 1) NIJE unaprijed
+  poznat - možda će neka strategija pokazati prednost, možda neće nijedna, kao što se dogodilo s
+  BTC/ETH/SOL (vidi "Ključni nalaz" i "Pretraga po više parova" gore). Pokreni ga i pogledaj
+  rezultat pošteno, ne traži potvrdu onoga što bi želio čuti.

@@ -504,6 +504,69 @@ async function refreshLiveRuns() {
   table.style.display = runs.length ? "table" : "none";
 }
 
+// ---------- Tvoj portfolio (Binance povijest proizvoljnih parova) ----------
+
+document.getElementById("bhTest").addEventListener("click", async () => {
+  const el = document.getElementById("bhResult");
+  el.textContent = "Testiram…";
+  try {
+    const r = await api("/api/binance-history/test-connection");
+    el.innerHTML = Object.entries(r)
+      .map(([pair, s]) => `<p><span class="pill ${s.ok ? "ok" : "fail"}">${pair}</span> ${s.message}</p>`)
+      .join("");
+  } catch (err) {
+    el.textContent = "Greška: " + err.message;
+  }
+});
+
+async function syncBinancePair(pair) {
+  return api("/api/binance-history/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pair }),
+  });
+}
+
+document.getElementById("bhSyncAll").addEventListener("click", async () => {
+  const el = document.getElementById("bhResult");
+  el.textContent = "Sinkroniziram…";
+  const { pairs } = await api("/api/binance-history/pairs");
+  const lines = [];
+  for (const pair of pairs) {
+    try {
+      const r = await syncBinancePair(pair);
+      lines.push(`<p><span class="pill ok">${pair}</span> ${r.rows} dnevnih svijeća sinkronizirano.</p>`);
+    } catch (err) {
+      lines.push(`<p><span class="pill fail">${pair}</span> ${err.message}</p>`);
+    }
+    el.innerHTML = lines.join("");
+  }
+  await refreshPairSelectors();
+});
+
+document.getElementById("bhSyncManual").addEventListener("click", async () => {
+  const pair = document.getElementById("bhManualPair").value.trim();
+  if (!pair) return;
+  const el = document.getElementById("bhResult");
+  el.textContent = `Sinkroniziram ${pair}…`;
+  try {
+    const r = await syncBinancePair(pair);
+    el.innerHTML = `<p><span class="pill ok">${pair}</span> ${r.rows} dnevnih svijeća sinkronizirano.</p>`;
+    await refreshPairSelectors();
+  } catch (err) {
+    el.innerHTML = `<p><span class="pill fail">${pair}</span> ${err.message}</p>`;
+  }
+});
+
+async function refreshPairSelectors() {
+  const { pairs } = await api("/api/pairs");
+  PAIRS = pairs;
+  fillSelect("btPair", pairs);
+  fillSelect("ppPair", pairs);
+  fillSelect("lvPair", pairs);
+  fillSelect("optPair", pairs);
+}
+
 init();
 setInterval(refreshPaperRuns, 30000);
 

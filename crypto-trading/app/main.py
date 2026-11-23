@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app import coinbase_client, config, db, equity_client, live_engine, paper_engine
+from app import binance_history_client, coinbase_client, config, db, equity_client, live_engine, paper_engine
 from app.backtest import run_backtest
 from app.candles import available_pairs
 from app.macro_clients import MACRO_CLIENTS, all_labels, test_all_connections
@@ -164,6 +164,35 @@ def macro_sync(source: str, label: str):
     try:
         count = client.sync_to_db(conn, label)
         return {"source": source, "label": label, "rows": count}
+    except Exception as err:
+        raise HTTPException(502, str(err))
+    finally:
+        conn.close()
+
+
+# ---------- Binance povijest za proizvoljne parove (npr. tvoj stvarni portfolio) ----------
+
+@app.get("/api/binance-history/pairs")
+def binance_history_pairs():
+    return {"pairs": list(binance_history_client.PORTFOLIO_PAIRS)}
+
+
+@app.get("/api/binance-history/test-connection")
+def binance_history_test_connection():
+    return binance_history_client.test_connection()
+
+
+class BinanceSyncRequest(BaseModel):
+    pair: str
+    since: str = "2017-01-01"
+
+
+@app.post("/api/binance-history/sync")
+def binance_history_sync(req: BinanceSyncRequest):
+    conn = db.get_connection()
+    try:
+        count = binance_history_client.sync_to_db(conn, req.pair, req.since)
+        return {"pair": req.pair, "rows": count}
     except Exception as err:
         raise HTTPException(502, str(err))
     finally:
