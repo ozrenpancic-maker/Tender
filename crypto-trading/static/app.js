@@ -5,6 +5,9 @@ const STRATEGY_COLORS = {
   rsi_meanrev: "#059669",
   dip_buy_volume: "#d97706",
   equity_filtered: "#7c3aed",
+  multi_macro_filter: "#be185d",
+  technical_composite: "#0891b2",
+  macro_signal_composite: "#ca8a04",
 };
 
 async function api(path, options) {
@@ -61,6 +64,7 @@ async function init() {
   await refreshLiveStatus();
   await refreshPaperRuns();
   await refreshLiveRuns();
+  await renderMacroSyncRows();
 }
 
 function fillSelect(id, values, labels) {
@@ -215,6 +219,70 @@ document.getElementById("eqSyncAll").addEventListener("click", async () => {
     }
   }
   el.innerHTML = lines.join("");
+});
+
+// ---------- Makro / sentiment / regulativa ----------
+
+const SOURCE_TITLES = {
+  fred: "FRED (makro)",
+  defillama: "DeFiLlama (TVL)",
+  coingecko: "CoinGecko (ponuda tokena)",
+  google_trends: "Google Trends",
+  reddit: "Reddit sentiment",
+  etf_flow: "ETF tokovi",
+  regulatory: "Regulativa (SEC/CFTC)",
+};
+
+async function renderMacroSyncRows() {
+  const { sources } = await api("/api/macro/labels");
+  const container = document.getElementById("macroSyncRows");
+  container.innerHTML = "";
+
+  for (const [source, labels] of Object.entries(sources)) {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.style.marginBottom = "6px";
+    const title = document.createElement("strong");
+    title.textContent = SOURCE_TITLES[source] || source;
+    title.style.minWidth = "180px";
+    row.appendChild(title);
+
+    for (const label of labels) {
+      const btn = document.createElement("button");
+      btn.className = "secondary";
+      btn.textContent = `Sinkroniziraj ${label}`;
+      btn.onclick = async () => {
+        const resultEl = document.getElementById("macroResult");
+        resultEl.textContent = `Sinkroniziram ${label}…`;
+        try {
+          const r = await api(`/api/macro/sync/${source}/${label}`, { method: "POST" });
+          resultEl.innerHTML = `<p><span class="pill ok">${label}</span> ${r.rows} redaka sinkronizirano.</p>`;
+        } catch (err) {
+          resultEl.innerHTML = `<p><span class="pill fail">${label}</span> ${err.message}</p>`;
+        }
+      };
+      row.appendChild(btn);
+    }
+    container.appendChild(row);
+  }
+}
+
+document.getElementById("macroTest").addEventListener("click", async () => {
+  const el = document.getElementById("macroResult");
+  el.textContent = "Testiram sve veze…";
+  try {
+    const r = await api("/api/macro/test-connection");
+    const lines = [];
+    for (const [source, labels] of Object.entries(r)) {
+      lines.push(`<p><strong>${SOURCE_TITLES[source] || source}</strong></p>`);
+      for (const [label, s] of Object.entries(labels)) {
+        lines.push(`<p style="margin-left:12px"><span class="pill ${s.ok ? "ok" : "fail"}">${label}</span> ${s.message}</p>`);
+      }
+    }
+    el.innerHTML = lines.join("");
+  } catch (err) {
+    el.textContent = "Greška: " + err.message;
+  }
 });
 
 // ---------- Optimizacija ----------

@@ -18,3 +18,10 @@ LIVE_MAX_POSITION_EUR = float(os.environ.get("LIVE_MAX_POSITION_EUR", "0"))
 LIVE_DAILY_LOSS_LIMIT_EUR = float(os.environ.get("LIVE_DAILY_LOSS_LIMIT_EUR", "0"))
 
 PAPER_STARTING_BALANCE_EUR = float(os.environ.get("PAPER_STARTING_BALANCE_EUR", "500"))
+
+# FRED (Federal Reserve Economic Data) - besplatan ključ: fred.stlouisfed.org/docs/api/api_key.html
+FRED_API_KEY = os.environ.get("FRED_API_KEY", "")
+
+# Reddit OAuth2 (client credentials) - besplatna registracija aplikacije: reddit.com/prefs/apps
+REDDIT_CLIENT_ID = os.environ.get("REDDIT_CLIENT_ID", "")
+REDDIT_CLIENT_SECRET = os.environ.get("REDDIT_CLIENT_SECRET", "")

@@ -44,6 +44,17 @@ CREATE TABLE IF NOT EXISTS live_order (
     created_at INTEGER NOT NULL
 );
 
+-- Jedna vrijednost po danu (ne OHLC) - za FRED makro serije, DeFiLlama TVL, CoinGecko ponudu
+-- tokena, Google Trends interes, Reddit/regulatorni sentiment skor itd.
+CREATE TABLE IF NOT EXISTS macro_series (
+    source TEXT NOT NULL, -- fred | defillama | coingecko | google_trends | reddit | etf_flow | regulatory
+    series_id TEXT NOT NULL, -- npr. 'FEDFUNDS', 'ethereum' (TVL chain), 'bitcoin' (coingecko id)
+    observed_date TEXT NOT NULL, -- YYYY-MM-DD (UTC)
+    value REAL NOT NULL,
+    imported_at INTEGER NOT NULL,
+    PRIMARY KEY (source, series_id, observed_date)
+);
+
 CREATE TABLE IF NOT EXISTS backtest_run (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     strategy TEXT NOT NULL,

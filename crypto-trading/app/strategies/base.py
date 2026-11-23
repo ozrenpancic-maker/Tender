@@ -20,6 +20,7 @@ class StrategyContext:
     in_position: bool  # ima li se trenutno otvorena pozicija (kupljeno)
     params: dict
     aux: dict[str, list[Candle]] = field(default_factory=dict)  # npr. {"SPX": [...]} - vidi app.aux
+    series: dict[str, list[tuple[int, float]]] = field(default_factory=dict)  # npr. {"FEDFUNDS": [...]} - ne-OHLC serije
 
 
 Strategy = Callable[[StrategyContext], Decision]

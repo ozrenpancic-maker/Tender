@@ -28,6 +28,47 @@ Obje testiraju ideju da kripto cijene dobrim dijelom prate opće tržišno raspo
 sinkronizirane S&P 500 / zlato podatke (dashboard, odjeljak 2) prije pokretanja backtesta; bez toga
 bacaju jasnu grešku umjesto da tiho zanemare filter.
 
+### Širi popis čimbenika (tehnička analiza, makro, sentiment, regulativa, fundamentalno)
+
+Dodane su dvije daljnje strategije i šest novih izvora podataka, prema opsežnom popisu čimbenika
+("tehnička analiza, order book, kitovi, on-chain, sentiment, makroekonomija, ETF tokovi,
+fundamentalna analiza, tokenomics, regulativa") koji bi napredni kripto trading sustav trebao
+razmatrati. Nisu dodane sve kategorije - neke (order book dubina, praćenje "kitova", on-chain
+metrike poput MVRV/SOPR) zahtijevaju plaćene pretplate (Glassnode/Nansen/CryptoQuant) ili
+infrastrukturu za koju trenutno nema opravdanja bez takve pretplate; vidi popis "Namjerno
+izostavljeno" niže.
+
+**`technical_composite`** - kombinira EMA200 trend filter, MACD presjek i OBV (volumen) potvrdu
+umjesto oslanjanja na jedan indikator. Ne treba nove vanjske podatke (čista matematika nad
+postojećim svijećama). Konzistentno niži maksimalni pad od `sma_crossover` na istom razdoblju
+(2022-2026: 24-40% umjesto 44-67%), uz mješovite rezultate po paru (profitabilan na 3 od 4 testirana
+para, gubi na SOL/USDT) - vidi `app/indicators.py` za sve dodane indikatore (EMA, MACD, Stochastic
+RSI, ROC, OBV, ATR, Bollinger Bands).
+
+**`macro_signal_composite`** - obavezan EMA200 trend gate plus glasovanje 4 neovisna signala (Fed
+stopa ne raste, Reddit sentiment, regulatorni skor, ETF tokovi) - kupnja samo ako dovoljno glasova
+kaže "risk-on". Nedostajući podatak se ne broji ni za ni protiv (ne nagađa se). Treba sve 4 serije
+sinkronizirane (dashboard, odjeljak 3) prije backtesta.
+
+Novi besplatni/sivo-područje izvori (dashboard, odjeljak 3; detalji i env varijable u "Pokretanje"):
+
+| Izvor | Što daje | Cijena | Pouzdanost |
+|---|---|---|---|
+| FRED | Fed stopa, CPI, nezaposlenost, BDP | Besplatno (treba ključ) | Službeni API, visoka |
+| DeFiLlama | TVL po chainu (Ethereum, Solana) | Besplatno, bez ključa | Službeni API, visoka |
+| CoinGecko | Implicitna cirkulirajuća ponuda (market cap / cijena) | Besplatno, bez ključa, rate-limited | Službeni API, visoka |
+| Google Trends | Interes za pretrage ("bitcoin", "crypto") | Besplatno, neslužbeno (pytrends) | **Niska** - Google često mijenja zaštite, može prestati raditi bez najave |
+| Reddit | Grub leksikonski sentiment (r/Bitcoin, r/CryptoCurrency) | Besplatno (treba app registraciju) | Srednja - leksikon je grub, nije NLP model |
+| ETF tokovi | Dnevni neto tok BTC/ETH spot ETF-ova | Besplatno, scraping (farside.co.uk) | **Niska** - HTML scraping, krhko |
+| Regulativa | Leksikonski skor SEC/CFTC RSS objava | Besplatno, RSS | Srednja - leksikon je grub, ne pravna analiza |
+
+**Namjerno izostavljeno** (zahtijeva plaćenu pretplatu koju aplikacija ne pretpostavlja da korisnik
+želi platiti bez pitanja): praćenje "kitova" (Glassnode/Nansen/Whale Alert), on-chain izvedene
+metrike poput MVRV/NVT/SOPR/exchange in-outflow (isti davatelji), i order book dubina/zidovi (javno
+dostupno uživo preko Coinbase websocketa, ali **nema besplatnih povijesnih order book podataka** pa
+se ne bi moglo ni backtestirati, samo uživo promatrati). Ako želiš ovo, javi koji servis planiraš
+platiti pa se dogradi integracija s tim API ključem.
+
 ### Zašto "pronađi profitabilnu strategiju" nije tako jednostavno kako zvuči
 
 Dodan je **optimizator s in-sample/out-of-sample provjerom** (dashboard, odjeljak 3; `app/optimizer.py`)
@@ -95,6 +136,16 @@ razdoblja (2022–2026, po godinama, uključujući medvjeđe tržište 2022.). N
 - **`app/equity_client.py`** — dnevni podaci za S&P 500 / Dow / Nasdaq / zlato sa Stooq-a (javno,
   bez ključa), za makro-filter strategije. `app/aux.py` poravnava kripto (trguje se 7 dana u tjednu)
   i equity/zlato (zatvoreno vikendom) kalendare uzimanjem zadnje poznate cijene na/prije danog dana.
+- **`app/indicators.py`** — čiste funkcije za EMA, MACD, Stochastic RSI, ROC, OBV, ATR, Bollinger
+  Bands - bez vanjskih poziva, koriste ih `technical_composite` i `macro_signal_composite`.
+- **`app/macro_store.py`** + `macro_series` tablica — generička pohrana ne-OHLC serija (jedna
+  vrijednost po danu), zajednička za sve nove makro/sentiment izvore. `app/aux.py` ima odgovarajuće
+  pomoćne funkcije (`series_value_on_or_before`, `series_change_pct`) za ovaj oblik podataka.
+- **`app/fred_client.py`**, **`app/defillama_client.py`**, **`app/coingecko_client.py`**,
+  **`app/trends_client.py`**, **`app/reddit_client.py`**, **`app/etf_client.py`**,
+  **`app/regulatory_client.py`** — po jedan klijent po izvoru, svaki s istim sučeljem
+  (`fetch_recent`, `sync_to_db`, `test_connection`). `app/macro_clients.py` je registar koji ih
+  povezuje po imenu izvora - koristi ga paper/live engine i API rute.
 - **`app/optimizer.py`** — grid search parametara na in-sample razdoblju + provjera top 5 na
   out-of-sample razdoblju, radi smanjenja (ne eliminacije) rizika od curve fittinga.
 - **`app/paper_engine.py`** — pozadinska nit po pokrenutom runu, svakih 5 min provjerava je li
@@ -182,3 +233,18 @@ potpunog gubitka uloženih sredstava.
   ne beskonačno mnogo. Market režimi se mijenjaju; strategija provjerena na 2024–2026. ne mora raditi
   jednako u drugačijem tržišnom okruženju (npr. dugotrajni medvjeđi trend, nagla promjena kamatnih
   stopa, regulatorni šok).
+- Reddit i regulatorni (SEC/CFTC) "sentiment" su **leksikonsko brojanje riječi**, ne trenirani NLP
+  model - sarkazam, negacija ("nije bullish") i kontekst se NE prepoznaju. Tretiraj kao grub,
+  transparentan proxy, ne kao pouzdanu klasifikaciju raspoloženja.
+- Google Trends (`app/trends_client.py`, preko pytrends) je od svih dodanih izvora najkrhkiji -
+  neslužbeni pristup koji Google može blokirati/promijeniti bez najave. ETF tokovi
+  (`app/etf_client.py`) scrapaju javnu tablicu s farside.co.uk pa su slično krhki - provjeri Uvjete
+  korištenja te stranice prije redovitog automatiziranog pristupa, kao i kod EOJN scrapera u Tender
+  aplikaciji.
+- CoinGecko besplatni tier ima strog rate limit (okvirno 10-30 poziva/min) - `sync_to_db` treba
+  pokretati rijetko (ručno s dashboarda), ne u petlji ili automatski na svaki paper/live tick.
+- "Implicitna cirkulirajuća ponuda" u `coingecko_client.py` (market cap / cijena) je aproksimacija,
+  ne službeni podatak o ponudi - dovoljno dobra za grubi trend, ne za precizan tokenomics izračun.
+- `macro_signal_composite` treba sve 4 serije (FRED, Reddit, regulativa, ETF tok) sinkronizirane da
+  bi uopće pokrenuo backtest - namjerno strože od "nedostajući glas se ne broji" unutar same odluke
+  (to pravilo vrijedi tek kad su serije sinkronizirane, ali pojedini dani unutar njih nedostaju).

@@ -25,6 +25,18 @@ DEFAULT_GRIDS: dict[str, dict[str, list]] = {
         "gold_sma": [20, 50],
         "gold_spike_pct": [0.03, 0.05, 0.08],
     },
+    "technical_composite": {
+        "ema_trend": [100, 150, 200],
+        "macd_fast": [8, 12],
+        "macd_slow": [21, 26],
+        "obv_lookback": [5, 10, 20],
+        "require_obv_confirm": [True, False],
+    },
+    "macro_signal_composite": {
+        "ema_trend": [100, 150, 200],
+        "min_risk_on_votes": [2, 3, 4],
+        "fed_lookback": [1, 3, 6],
+    },
 }
 
 MAX_COMBINATIONS = 400

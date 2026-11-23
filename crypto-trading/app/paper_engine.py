@@ -6,6 +6,7 @@ import time
 
 from app import coinbase_client, db, equity_client
 from app.costs import FEE, buy_fill_price, sell_fill_price
+from app.macro_clients import MACRO_CLIENTS
 from app.strategies import GENERIC_STRATEGIES
 from app.strategies.base import StrategyContext
 
@@ -84,7 +85,16 @@ def _tick(run_id: int) -> None:
                 print(f"[paper_engine] run {run_id}: ne mogu dohvatiti {label} ({err}) - preskačem ovaj tick.")
                 return
 
-        ctx = StrategyContext(candles=candles, index=len(candles) - 1, in_position=in_position, params=params, aux=aux)
+        series = {}
+        for spec in strategy.get("needs_series", []):
+            try:
+                client = MACRO_CLIENTS[spec["source"]]
+                series[spec["series_id"]] = client.fetch_recent(spec["series_id"], days=400)
+            except Exception as err:
+                print(f"[paper_engine] run {run_id}: ne mogu dohvatiti {spec['series_id']} ({err}) - preskačem ovaj tick.")
+                return
+
+        ctx = StrategyContext(candles=candles, index=len(candles) - 1, in_position=in_position, params=params, aux=aux, series=series)
         decision = strategy["decide"](ctx)
 
         if decision == "buy" and not in_position:

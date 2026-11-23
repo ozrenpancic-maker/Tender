@@ -2,16 +2,25 @@
 jednog dana zakašnjenja. To je ista konvencija vremena izvršenja kao u priloženom baznom testu."""
 from app.candles import Candle, load_candles
 from app.costs import buy_fill_price, sell_fill_price, FEE
+from app.macro_store import load_series
 from app.strategies import GENERIC_STRATEGIES
 from app.strategies.base import StrategyContext
 from app.strategies.baseline_2pct import run_baseline
 
 
-def run_generic_backtest(candles: list[Candle], strategy_key: str, params: dict, starting_balance: float, aux: dict | None = None) -> dict:
+def run_generic_backtest(
+    candles: list[Candle],
+    strategy_key: str,
+    params: dict,
+    starting_balance: float,
+    aux: dict | None = None,
+    series: dict | None = None,
+) -> dict:
     strategy = GENERIC_STRATEGIES[strategy_key]
     decide = strategy["decide"]
     params = {**strategy["default_params"], **params}
     aux = aux or {}
+    series = series or {}
 
     cash = starting_balance
     position_base = 0.0
@@ -24,7 +33,7 @@ def run_generic_backtest(candles: list[Candle], strategy_key: str, params: dict,
     equity_curve = []
 
     for i in range(len(candles) - 1):
-        ctx = StrategyContext(candles=candles, index=i, in_position=in_position, params=params, aux=aux)
+        ctx = StrategyContext(candles=candles, index=i, in_position=in_position, params=params, aux=aux, series=series)
         decision = decide(ctx)
         next_candle = candles[i + 1]
 
@@ -117,4 +126,14 @@ def run_backtest(conn, strategy_key: str, pair: str, start_ts: int, end_ts: int,
             )
         aux[label] = aux_candles
 
-    return run_generic_backtest(candles, strategy_key, params, starting_balance, aux)
+    series = {}
+    for spec in GENERIC_STRATEGIES[strategy_key].get("needs_series", []):
+        points = load_series(conn, spec["source"], spec["series_id"], start_ts - 365 * 86400, end_ts)
+        if not points:
+            raise ValueError(
+                f"Strategija '{strategy_key}' treba podatke '{spec['series_id']}' ({spec['source']}), "
+                f"a nisu sinkronizirani. Pokreni sync na dashboardu (odjeljak Makro/sentiment) prvo."
+            )
+        series[spec["series_id"]] = points
+
+    return run_generic_backtest(candles, strategy_key, params, starting_balance, aux, series)

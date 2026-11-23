@@ -84,7 +84,25 @@
   </section>
 
   <section>
-    <h2>3. Optimizacija parametara (in-sample / out-of-sample)</h2>
+    <h2>3. Makro, sentiment i regulativa</h2>
+    <p class="muted">
+      Besplatni izvori: <strong>FRED</strong> (Fed stopa/CPI/nezaposlenost — treba besplatan FRED_API_KEY),
+      <strong>DeFiLlama</strong> (TVL, bez ključa), <strong>CoinGecko</strong> (ponuda tokena, bez ključa).
+      Sivo područje (neslužbeno/krhko): <strong>Google Trends</strong> (neslužbeni scraping),
+      <strong>Reddit</strong> (grub leksikon sentimenta, treba besplatnu registraciju aplikacije),
+      <strong>ETF tokovi</strong> (scraping farside.co.uk) i <strong>regulativa</strong> (SEC/CFTC RSS,
+      grub leksikon). Ovo posljednje nije pravna ni NLP analiza — tretiraj kao grub signal, ne zaključak.
+      Koristi ga strategija "Makro glasovanje" (odjeljak 1).
+    </p>
+    <div class="row">
+      <button class="secondary" id="macroTest">Testiraj sve veze</button>
+    </div>
+    <div id="macroSyncRows" style="margin-top:12px"></div>
+    <div id="macroResult" style="margin-top:12px"></div>
+  </section>
+
+  <section>
+    <h2>4. Optimizacija parametara (in-sample / out-of-sample)</h2>
     <p class="muted">
       Pretražuje kombinacije parametara na "in-sample" razdoblju i rangira ih po rezultatu, zatim
       par najboljih provjerava na "out-of-sample" razdoblju koje optimizacija nije vidjela.
@@ -138,14 +156,14 @@
   </section>
 
   <section>
-    <h2>4. Coinbase veza</h2>
+    <h2>5. Coinbase veza</h2>
     <p class="muted">Javni cjenovni feed ne treba ključ. Autenticirani dio (stanje računa, slanje naloga) treba API ključ u .env — vidi README.</p>
     <button id="cbTest">Testiraj vezu</button>
     <div id="cbResult" style="margin-top:12px"></div>
   </section>
 
   <section>
-    <h2>5. Paper trading (simulacija na živim cijenama, bez pravog novca)</h2>
+    <h2>6. Paper trading (simulacija na živim cijenama, bez pravog novca)</h2>
     <div class="row">
       <div class="field">
         <label>Strategija</label>
@@ -171,7 +189,7 @@
   </section>
 
   <section>
-    <h2>6. Live trgovanje (pravi novac)</h2>
+    <h2>7. Live trgovanje (pravi novac)</h2>
     <div id="liveDetailBanner"></div>
     <div class="row" id="liveStartForm" style="display:none">
       <div class="field">

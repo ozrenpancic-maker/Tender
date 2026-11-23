@@ -15,6 +15,7 @@ import threading
 import time
 
 from app import coinbase_client, config, db, equity_client
+from app.macro_clients import MACRO_CLIENTS
 from app.strategies import GENERIC_STRATEGIES
 from app.strategies.base import StrategyContext
 
@@ -124,7 +125,16 @@ def _tick(run_id: int) -> None:
                 print(f"[live_engine] run {run_id}: ne mogu dohvatiti {label} ({err}) - preskačem ovaj tick (nema trgovanja bez makro podatka).")
                 return
 
-        ctx = StrategyContext(candles=candles, index=len(candles) - 1, in_position=in_position, params=params, aux=aux)
+        series = {}
+        for spec in strategy.get("needs_series", []):
+            try:
+                client = MACRO_CLIENTS[spec["source"]]
+                series[spec["series_id"]] = client.fetch_recent(spec["series_id"], days=400)
+            except Exception as err:
+                print(f"[live_engine] run {run_id}: ne mogu dohvatiti {spec['series_id']} ({err}) - preskačem ovaj tick (nema trgovanja bez podatka).")
+                return
+
+        ctx = StrategyContext(candles=candles, index=len(candles) - 1, in_position=in_position, params=params, aux=aux, series=series)
         decision = strategy["decide"](ctx)
 
         loss_limit_breached = _daily_loss_limit_breached(conn, run_id)

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from app import coinbase_client, config, db, equity_client, live_engine, paper_engine
 from app.backtest import run_backtest
 from app.candles import available_pairs
+from app.macro_clients import MACRO_CLIENTS, all_labels, test_all_connections
 from app.optimizer import DEFAULT_GRIDS, optimize
 from app.strategies import GENERIC_STRATEGIES
 
@@ -43,6 +44,7 @@ def list_strategies():
                 "default_params": s["default_params"],
                 "backtest_only": False,
                 "needs_aux": s.get("needs_aux", []),
+                "needs_series": s.get("needs_series", []),
             }
         )
     return {"strategies": items}
@@ -137,6 +139,33 @@ def run_optimize(req: OptimizeRequest):
         return optimize(conn, req.strategy, req.pair, in_start, in_end, out_start, out_end, req.starting_balance, req.param_grid)
     except ValueError as err:
         raise HTTPException(400, str(err))
+    finally:
+        conn.close()
+
+
+# ---------- Makro / sentiment / fundamentalno (FRED, DeFiLlama, CoinGecko, Trends, Reddit, ETF, regulativa) ----------
+
+@app.get("/api/macro/labels")
+def macro_labels():
+    return {"sources": all_labels()}
+
+
+@app.get("/api/macro/test-connection")
+def macro_test_connection():
+    return test_all_connections()
+
+
+@app.post("/api/macro/sync/{source}/{label}")
+def macro_sync(source: str, label: str):
+    client = MACRO_CLIENTS.get(source)
+    if not client:
+        raise HTTPException(400, f"Nepoznat izvor '{source}'. Dostupno: {list(MACRO_CLIENTS)}")
+    conn = db.get_connection()
+    try:
+        count = client.sync_to_db(conn, label)
+        return {"source": source, "label": label, "rows": count}
+    except Exception as err:
+        raise HTTPException(502, str(err))
     finally:
         conn.close()
 
