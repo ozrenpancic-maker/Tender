@@ -303,11 +303,47 @@
   </section>
 
   <section>
-    <h2>10. Live trgovanje</h2>
+    <h2>10. Automatizirani paper trading (AI sam bira coin)</h2>
+    <p class="muted">
+      AI Prediction Engine (odjeljak 1) svaki sat/4h sam rangira sve coinove iz portfolija po AI
+      Score-u i odlučuje kupnju/prodaju - i dalje isključivo simulacija, bez pravog novca i bez
+      Coinbase trgovačkih ključeva (vidi README "Automatizirani paper trading"). Koristi se samo
+      validirani horizont (1h ili 4h).
+    </p>
+    <div class="row">
+      <div class="field">
+        <label>Horizont</label>
+        <select id="atHorizon">
+          <option value="1h">1 sat</option>
+          <option value="4h">4 sata</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Virtualna sredstva (EUR)</label>
+        <input type="number" id="atBalance" value="1000" />
+      </div>
+      <div class="field">
+        <label>Max po coinu (%)</label>
+        <input type="number" id="atMaxPct" value="20" min="1" max="100" />
+      </div>
+      <button id="atStart">Pokreni auto-trader</button>
+    </div>
+    <table id="atTable" style="display:none">
+      <thead>
+        <tr><th>#</th><th>Horizont</th><th>Status</th><th>Trenutna vrijednost</th><th>Otvorene pozicije</th><th>Akcija</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div id="atDetail"></div>
+  </section>
+
+  <section>
+    <h2>11. Live trgovanje</h2>
     <p class="muted">
       Namjerno uklonjeno (KriptoMVP 4.4 nepromjenjiva pravila) - aplikacija je isključivo savjetnik
       i simulator. Ne postoji kod koji šalje prave naloge niti traži Coinbase trgovačke API
-      ključeve ili pristup računu/novčaniku. Koristi "Paper trading" (odjeljak 9) za simulaciju.
+      ključeve ili pristup računu/novčaniku. Koristi "Paper trading" (odjeljak 9) ili "Automatizirani
+      paper trading" (odjeljak 10) za simulaciju.
     </p>
   </section>
 

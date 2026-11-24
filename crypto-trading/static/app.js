@@ -82,6 +82,7 @@ async function init() {
     tradable.reduce((acc, s) => ({ ...acc, [s.key]: s.label }), {}),
   );
   await refreshPaperRuns();
+  await refreshAutoTraderRuns();
   await renderMacroSyncRows();
 }
 
@@ -484,6 +485,84 @@ async function showPaperDetail(runId) {
       .map(
         (t) =>
           `<tr><td>${new Date(t.executed_at * 1000).toLocaleString("hr-HR")}</td><td>${t.side}</td><td>${fmtEur(t.price)}</td></tr>`,
+      )
+      .join("")}</tbody>`;
+    el.appendChild(list);
+  }
+}
+
+// ---------- Automatizirani paper trading (AI bira coin) ----------
+
+document.getElementById("atStart").addEventListener("click", async () => {
+  const horizon = document.getElementById("atHorizon").value;
+  const starting_balance = Number(document.getElementById("atBalance").value);
+  const max_position_pct = Number(document.getElementById("atMaxPct").value) / 100;
+  try {
+    await api("/api/auto-trader/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ horizon, starting_balance, max_position_pct }),
+    });
+    refreshAutoTraderRuns();
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+async function refreshAutoTraderRuns() {
+  const { runs } = await api("/api/auto-trader/runs");
+  const table = document.getElementById("atTable");
+  const tbody = table.querySelector("tbody");
+  tbody.innerHTML = "";
+  for (const run of runs) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${run.id}</td><td>${run.horizon}</td><td>${run.status}</td>
+      <td>${fmtEur(run.current_equity_eur)}</td><td>${run.open_positions}</td><td></td>`;
+    const actionCell = tr.querySelector("td:last-child");
+    const viewBtn = document.createElement("button");
+    viewBtn.className = "secondary";
+    viewBtn.textContent = "Detalji";
+    viewBtn.onclick = () => showAutoTraderDetail(run.id);
+    actionCell.appendChild(viewBtn);
+    if (run.status === "running") {
+      const stopBtn = document.createElement("button");
+      stopBtn.className = "danger-btn";
+      stopBtn.textContent = "Zaustavi";
+      stopBtn.style.marginLeft = "6px";
+      stopBtn.onclick = async () => {
+        await api(`/api/auto-trader/${run.id}/stop`, { method: "POST" });
+        refreshAutoTraderRuns();
+      };
+      actionCell.appendChild(stopBtn);
+    }
+    tbody.appendChild(tr);
+  }
+  table.style.display = runs.length ? "table" : "none";
+}
+
+async function showAutoTraderDetail(runId) {
+  const { run, trades, positions } = await api(`/api/auto-trader/${runId}`);
+  const universe = JSON.parse(run.universe_json);
+  const el = document.getElementById("atDetail");
+  el.innerHTML = `<h3>Run #${run.id} — ${run.horizon}</h3>
+    <p class="muted">Pokrenut ${new Date(run.started_at * 1000).toLocaleString("hr-HR")}. Univerzum: ${universe.join(", ")}.
+    Gotovina: ${fmtEur(run.cash_eur)}. ${trades.length} trgovina.</p>`;
+  if (positions.filter((p) => !p.closed_at).length) {
+    const list = document.createElement("table");
+    list.innerHTML = `<thead><tr><th>Par</th><th>Ušao</th><th>Ulog</th></tr></thead><tbody>${positions
+      .filter((p) => !p.closed_at)
+      .map((p) => `<tr><td>${p.pair}</td><td>${fmtEur(p.entry_price)}</td><td>${fmtEur(p.entry_eur)}</td></tr>`)
+      .join("")}</tbody>`;
+    el.appendChild(list);
+  }
+  if (trades.length) {
+    const list = document.createElement("table");
+    list.innerHTML = `<thead><tr><th>Kad</th><th>Par</th><th>Strana</th><th>Cijena</th><th>AI Score</th><th>Odluka</th></tr></thead><tbody>${trades
+      .slice()
+      .reverse()
+      .map(
+        (t) =>
+          `<tr><td>${new Date(t.executed_at * 1000).toLocaleString("hr-HR")}</td><td>${t.pair}</td><td>${t.side}</td><td>${fmtEur(t.price)}</td><td>${t.ai_score ?? "-"}</td><td>${t.decision ?? "-"}</td></tr>`,
       )
       .join("")}</tbody>`;
     el.appendChild(list);

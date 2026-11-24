@@ -37,6 +37,9 @@ async def require_api_key(request: Request, call_next):
 def on_startup():
     db.ensure_schema()
     paper_engine.resume_running_on_startup()
+    from app import auto_trader
+
+    auto_trader.resume_running_on_startup()
 
 
 # ---------- Strategije / parovi ----------
@@ -373,6 +376,84 @@ def paper_detail(run_id: int):
             "SELECT * FROM paper_equity_point WHERE run_id=? AND equity_eur >= 0 ORDER BY at", (run_id,)
         ).fetchall()
         return {"run": dict(run), "trades": [dict(t) for t in trades], "equity_curve": [dict(e) for e in equity]}
+    finally:
+        conn.close()
+
+
+# ---------- Automatizirani multi-coin paper trading (AI bira coin) ----------
+
+class AutoTraderStartRequest(BaseModel):
+    horizon: str  # '1h' ili '4h' - samo validirani horizonti
+    universe: list[str] = []  # prazno = korisnikov portfolio (PORTFOLIO_PAIRS)
+    starting_balance: float = 1000.0
+    max_position_pct: float = 0.2  # 20% budžeta po coinu
+
+
+@app.post("/api/auto-trader/start")
+def auto_trader_start(req: AutoTraderStartRequest):
+    from app import auto_trader
+    from app.ml.engine import is_horizon_validated
+
+    if not is_horizon_validated(req.horizon):
+        raise HTTPException(
+            400,
+            f"Horizont '{req.horizon}' trenutno nije validiran (vidi odjeljak 1, AI Prediction "
+            f"Engine) - automatizirani trading se ne pokreće na nevalidiranom modelu.",
+        )
+    universe = req.universe or list(binance_history_client.PORTFOLIO_PAIRS)
+    try:
+        run_id = auto_trader.start_run(req.horizon, universe, req.starting_balance, req.max_position_pct)
+        return {"run_id": run_id}
+    except ValueError as err:
+        raise HTTPException(400, str(err))
+
+
+@app.post("/api/auto-trader/{run_id}/stop")
+def auto_trader_stop(run_id: int):
+    from app import auto_trader
+
+    auto_trader.stop_run(run_id)
+    return {"ok": True}
+
+
+@app.get("/api/auto-trader/runs")
+def auto_trader_runs():
+    conn = db.get_connection()
+    try:
+        rows = conn.execute("SELECT * FROM auto_trader_run ORDER BY started_at DESC").fetchall()
+        runs = []
+        for r in rows:
+            run = dict(r)
+            last_point = conn.execute(
+                "SELECT equity_eur, at FROM auto_trader_equity_point WHERE run_id=? ORDER BY at DESC LIMIT 1", (run["id"],)
+            ).fetchone()
+            run["current_equity_eur"] = last_point["equity_eur"] if last_point else run["starting_balance_eur"]
+            run["last_update_at"] = last_point["at"] if last_point else None
+            run["open_positions"] = conn.execute(
+                "SELECT COUNT(*) AS n FROM auto_trader_position WHERE run_id=? AND closed_at IS NULL", (run["id"],)
+            ).fetchone()["n"]
+            runs.append(run)
+        return {"runs": runs}
+    finally:
+        conn.close()
+
+
+@app.get("/api/auto-trader/{run_id}")
+def auto_trader_detail(run_id: int):
+    conn = db.get_connection()
+    try:
+        run = conn.execute("SELECT * FROM auto_trader_run WHERE id=?", (run_id,)).fetchone()
+        if not run:
+            raise HTTPException(404, "Run nije pronađen.")
+        trades = conn.execute("SELECT * FROM auto_trader_trade WHERE run_id=? ORDER BY executed_at", (run_id,)).fetchall()
+        positions = conn.execute("SELECT * FROM auto_trader_position WHERE run_id=? ORDER BY opened_at", (run_id,)).fetchall()
+        equity = conn.execute("SELECT * FROM auto_trader_equity_point WHERE run_id=? ORDER BY at", (run_id,)).fetchall()
+        return {
+            "run": dict(run),
+            "trades": [dict(t) for t in trades],
+            "positions": [dict(p) for p in positions],
+            "equity_curve": [dict(e) for e in equity],
+        }
     finally:
         conn.close()
 

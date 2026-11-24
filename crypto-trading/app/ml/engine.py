@@ -50,6 +50,21 @@ def _load_metadata() -> dict:
     return _metadata_cache
 
 
+def is_horizon_validated(horizon: str) -> bool:
+    """UVIJEK čita metadata.json svježe s diska (ne keširano) - koristi se za sigurnosnu provjeru
+    u app/auto_trader.py da se automatizirani run zaustavi čim horizont prestane biti validiran
+    (npr. nakon ponovnog treniranja dok je run već pokrenut), umjesto da nastavi raditi sa starim
+    keširanim statusom do restarta servera."""
+    path = MODELS_DIR / "metadata.json"
+    if not path.exists():
+        return False
+    try:
+        metadata = json.loads(path.read_text())
+    except Exception:
+        return False
+    return bool(metadata.get(horizon, {}).get("validated", False))
+
+
 def _load_model(horizon: str):
     if horizon not in _model_cache:
         path = MODELS_DIR / f"{horizon}_lgbm.joblib"

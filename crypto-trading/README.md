@@ -530,6 +530,10 @@ put stvarno POTVRĐENO da se projekt kompajlira i pakira u instalabilan APK.
 - **`app/paper_engine.py`** — pozadinska nit po pokrenutom runu, svakih 5 min provjerava je li
   stigla nova zatvorena dnevna svijeća, simulira trgovinu po živoj cijeni (isti troškovni model kao
   backtest), stanje uvijek rekonstruira iz zabilježenih trgovina (preživi restart servera).
+- **`app/auto_trader.py`** — automatizirani multi-coin paper trading: isti obrazac pozadinske niti
+  kao `paper_engine.py`, ali odluku o KOJEM coinu umjesto fiksne strategije donosi AI Prediction
+  Engine (`app/ml/engine.py`), rangirajući cijeli univerzum parova po AI Score-u svaki sat/4h. Vidi
+  "Automatizirani paper trading" iznad.
 - **`static/`** — dashboard (čisti HTML/CSS/JS, bez vanjskih ovisnosti, radi i bez interneta osim
   za Coinbase/Stooq pozive).
 
@@ -593,6 +597,46 @@ testirane** — ovo razvojno okruženje nema izlazni pristup internetu. Prije st
    simboli poput `^spx`/`^dji`/`^ndq`).
 3. Pokreni paper trading i prati barem nekoliko dana/tjedana prije nego vjeruješ signalima.
 
+## Automatizirani paper trading (AI bira coin) (`app/auto_trader.py`, dashboard odjeljak 10)
+
+Korisnik je tražio automatizirano trgovanje gdje aplikacija sama bira koji coin kupiti/prodati,
+unutar ograničenog iznosa, više puta dnevno. To se izravno sudara s pravilom #2/#3 ispod (nikad
+pravi nalozi, nikad Coinbase trgovački ključevi) - umjesto da se to pravilo zaobiđe ili ukine,
+korisniku je eksplicitno ponuđen izbor između automatiziranog **paper** tradinga (bez pravog
+novca), pravog automatiziranog tradinga uz jasno upozorenje o riziku, ili samo razgovora o opcijama.
+**Korisnik je odabrao automatizirani paper trading** - ovo poglavlje opisuje upravo to, i samo to.
+
+- **Odabir coina**: na svakoj granici horizont-perioda (svaki sat za `1h`, svaka 4 sata za `4h`),
+  pozove se već postojeći AI Prediction Engine (odjeljak 1) za svaki par iz univerzuma (po
+  defaultu korisnikov portfolio, `binance_history_client.PORTFOLIO_PAIRS`) i rangira kandidate za
+  kupnju po AI Score-u, od najvišeg prema najnižem.
+- **Samo validirani horizonti**: koristi se isključivo `1h` ili `4h` (vidi `data/models/metadata.json`
+  - `validated` zastavica po horizontu, iz walk-forward provjere opisane u odjeljku "AI Prediction
+  Engine"). `/api/auto-trader/start` odbija zahtjev (400) ako odabrani horizont trenutno nije
+  validiran.
+- **Sigurnosna provjera pri svakoj odluci**: `is_horizon_validated(horizon)` u `app/ml/engine.py`
+  čita `metadata.json` svježe s diska (ne iz keša) prije svake odluke - ako naknadno ponovno
+  treniranje makne validaciju za horizont dok je run već pokrenut, run se **automatski zaustavlja**
+  umjesto da nastavi "trgovati" na modelu koji više ne prolazi provjeru.
+- **Ograničenje ulaganja**: `max_position_pct` (default 20%) ograničava koliko se od **početnog**
+  budžeta smije uložiti u jedan coin odjednom; broj istovremeno otvorenih pozicija je ograničen na
+  `1 / max_position_pct` (npr. 20% → najviše 5 pozicija odjednom), pa je cijeli virtualni budžet
+  uvijek gornja granica izloženosti, nikad više.
+- **Jedna odluka po horizont-periodu**: provjera cijene/equity-a ide svakih 5 minuta (za glatku
+  krivulju), ali stvarna odluka kupi/prodaj se donosi samo jednom po satu/4h (ovisno o horizontu) -
+  sprječava pretjerano trgovanje unutar iste svijeće.
+- **Izlasci prije ulaska**: na svakoj odluci se prvo provjeravaju postojeće pozicije (prodaja ako
+  AI Prediction Engine za taj par sada javlja SELL/STRONG SELL), pa tek onda eventualni novi ulasci
+  u najbolje rangirane BUY/STRONG BUY kandidate koji nisu već u portfelju.
+- **Potpuni trag**: svaka kupnja/prodaja upisuje se u `auto_trader_trade` zajedno s AI Score-om i
+  kategorijom odluke u trenutku trgovanja (za reviziju unatrag) - vidi "Detalji" u dashboard
+  sekciji 10.
+- **I OVO JE SIMULACIJA**: cijene su stvarne, žive (javni Coinbase feed), ali novac je virtualan -
+  isti FEE/slippage model kao backtest i paper trading (odjeljak 9), bez ikakvog Coinbase
+  trgovačkog ključa ili pristupa računu. Nema koda koji bi ovo mogao pretvoriti u pravi nalog bez
+  da se prvo ponovno napiše `live_engine.py` (uklonjen, vidi pravilo ispod) i autenticirani
+  Coinbase klijent.
+
 ## Isključivo savjetnik/simulator (KriptoMVP 4.4 nepromjenjiva pravila)
 
 Aplikacija **nikada ne izvršava prave naloge** i ne traži Coinbase trgovačke (autenticirane) API
@@ -600,7 +644,8 @@ ključeve niti pristup računu/novčaniku - ta mogućnost (`app/live_engine.py`,
 `app/coinbase_client.py`, `/api/live/*` rute, dashboard sekcija "Live trgovanje") je namjerno
 potpuno uklonjena iz koda, ne samo isključena zastavicom - vidi git povijest ako ti treba za
 referencu. Koristi se isključivo javni, read-only Coinbase cjenovni feed (bez ključa), za paper
-trading i backtest.
+trading (ručni, odjeljak 9, i automatizirani, odjeljak 10) i backtest. "Automatizirano" u
+odjeljku 10 znači autonomna ODLUKA unutar simulacije, ne pravi nalog - vidi poglavlje iznad.
 
 ## Ograničenja koja treba znati
 
