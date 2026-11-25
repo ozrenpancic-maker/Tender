@@ -612,6 +612,40 @@ testirane** — ovo razvojno okruženje nema izlazni pristup internetu. Prije st
    simboli poput `^spx`/`^dji`/`^ndq`).
 3. Pokreni paper trading i prati barem nekoliko dana/tjedana prije nego vjeruješ signalima.
 
+## Zaključan test metodologija - provjera protiv stručnog savjeta (ChatGPT, točka 3)
+
+Korisnik je proslijedio savjet: zaključaj završni test prije podešavanja, izbaci primjere čiji
+ciljni prozor ulazi u test razdoblje, izvrši po prvoj dostupnoj cijeni nakon odluke, usporedi s
+buy&hold/gotovinom, ponovi s nepovoljnijim troškovima. Provjereno protiv postojećeg koda - VEĆINA
+ovoga je već bila ugrađena prije ovog savjeta (iz ranijih ChatGPT-ovih neovisnih revizija), samo
+nedovoljno istaknuto. Konkretno, po točkama:
+
+- **"Izbaci primjere čiji ciljni prozor ulazi u test"** → već postoji: `app/ml/dataset.py`
+  `walk_forward_folds(purge_seconds=...)`, pozvano iz `app/ml/train.py` s
+  `purge_seconds = steps_ahead * interval_min * 60` za svaki horizont. Test blok u svakom foldu
+  NIKAD ne sudjeluje u treningu/kalibraciji tog istog folda niti bilo kojeg ranijeg.
+- **"Izvrši po prvoj dostupnoj cijeni nakon odluke"** → već postoji: `run_generic_backtest`
+  donosi odluku na indeksu `i` (zatvorena svijeća `i`), a izvršava na `candles[i+1].open`
+  (SLJEDEĆE otvaranje), nikad na cijeni svijeće na kojoj je odluka donesena.
+- **"Usporedi s buy&hold i gotovinom"** → buy&hold je oduvijek postojao kao referentna strategija
+  u "Usporedba strategija" (odjeljak 4); **novo u ovom commitu**: dodan eksplicitan red "Gotovina
+  (bez trgovanja)" u istu tablicu/graf - ravna linija na polaznom iznosu, da se vidi "je li se
+  uopće isplatilo nešto raditi" bez mentalnog računanja.
+- **"Ponovi test s nepovoljnijim izvršenjem"** → već postoji: `run_cost_sensitivity` +
+  `COST_SCENARIOS` (odjeljak 4, "Osjetljivost na naknade/slippage") - uključuje `pessimistic_illiquid`
+  scenarij baš za ovu svrhu. Sad dodatno dopunjen maker/taker razlikom (vidi odjeljak iznad).
+- **"Zaključaj završni test prije podešavanja parametara"** → za rule-based strategije,
+  `app/optimizer.py` traži parametre ISKLJUČIVO na in-sample razdoblju, a out-of-sample provjera
+  ide tek na top 5 kandidata NAKON što su već odabrani - out-of-sample razdoblje se nikad ne
+  koristi za biranje. Za ML model nema odvojenog koraka "biranja hiperparametara" (fiksni su),
+  pa se pitanje ne postavlja na isti način - svaki walk-forward test blok se koristi točno
+  jednom, nikad za podešavanje.
+
+**Što ostaje otvoreno**: ništa u kodu trenutno ne sprječava ČOVJEKA da ručno pogleda
+out-of-sample/test brojke za VIŠE kombinacija nego što optimizator automatski vrati (top 5) i
+naknadno "bira" na temelju toga - kod strukturno pomaže (ne vraća sve kombinacije automatski), ali
+disciplina da se out-of-sample stvarno gleda samo jednom je i dalje na korisniku, ne (samo) na kodu.
+
 ## Realniji troškovni model za uživo simulaciju (`app/costs.py`, `app/coinbase_client.get_public_ticker`)
 
 Korisnik je proslijedio stručan savjet (ChatGPT) o troškovnom modelu: koristiti stvaran Coinbase

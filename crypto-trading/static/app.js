@@ -9,6 +9,7 @@ const STRATEGY_COLORS = {
   technical_composite: "#0891b2",
   macro_signal_composite: "#ca8a04",
   derivatives_extremes: "#15803d",
+  __cash__: "#94a3b8",
 };
 
 function getApiKey() {
@@ -135,6 +136,24 @@ document.getElementById("btRunAll").addEventListener("click", async () => {
       console.warn(key, err.message);
     }
   }
+  // Gotovina (bez trgovanja) kao eksplicitna usporedna točka - "je li se ovo uopće isplatilo
+  // naspram da sam ništa nije radio" (ChatGPT savjet, točka 3). Ravna linija na polaznom iznosu.
+  if (results.length) {
+    const anyCurve = results.find((r) => r.equity_curve && r.equity_curve.length)?.equity_curve;
+    if (anyCurve) {
+      results.push({
+        strategy: "__cash__",
+        final_balance: starting_balance,
+        trades: 0,
+        winning_trades: 0,
+        max_drawdown_pct: 0,
+        equity_curve: [
+          { at: anyCurve[0].at, equity: starting_balance },
+          { at: anyCurve[anyCurve.length - 1].at, equity: starting_balance },
+        ],
+      });
+    }
+  }
   renderBacktestTable(results, starting_balance);
   renderBacktestChart(results);
 });
@@ -210,7 +229,7 @@ function renderBacktestTable(results, startingBalance) {
     if (i === 0) tr.className = "best";
     if (i === sorted.length - 1 && sorted.length > 1) tr.className = "worst";
     const returnPct = ((r.final_balance / startingBalance - 1) * 100).toFixed(1);
-    const label = (STRATEGIES.find((s) => s.key === r.strategy) || {}).label || r.strategy;
+    const label = r.strategy === "__cash__" ? "Gotovina (bez trgovanja)" : (STRATEGIES.find((s) => s.key === r.strategy) || {}).label || r.strategy;
     tr.innerHTML = `<td>${label}</td><td>${fmtEur(r.final_balance)}</td><td>${returnPct}%</td>
       <td>${r.trades}</td><td>${r.winning_trades}</td><td>${fmtPct(r.max_drawdown_pct)}</td>`;
     tbody.appendChild(tr);
@@ -258,7 +277,7 @@ function renderBacktestChart(results) {
     ctx.fillStyle = STRATEGY_COLORS[r.strategy] || "#334155";
     ctx.fillRect(legendX, 6, 10, 10);
     ctx.fillStyle = "#334155";
-    const label = (STRATEGIES.find((s) => s.key === r.strategy) || {}).label || r.strategy;
+    const label = r.strategy === "__cash__" ? "Gotovina" : (STRATEGIES.find((s) => s.key === r.strategy) || {}).label || r.strategy;
     ctx.fillText(label, legendX + 14, 15);
     legendX += ctx.measureText(label).width + 36;
   }
