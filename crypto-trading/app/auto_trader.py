@@ -16,7 +16,7 @@ import threading
 import time
 
 from app import coinbase_client, db
-from app.costs import FEE, buy_fill_price, sell_fill_price
+from app.costs import TAKER_FEE, taker_buy_fill, taker_sell_fill
 from app.ml.engine import compute_prediction, is_horizon_validated
 
 POLL_INTERVAL_SECONDS = 300  # provjera svakih 5 min; stvarna odluka samo na granici horizont-perioda
@@ -66,8 +66,8 @@ def _tick(run_id: int) -> None:
         mark_value = 0.0
         for pos in open_positions:
             try:
-                price = coinbase_client.get_public_price(coinbase_client.to_product_id(pos["pair"]))
-                mark_value += pos["quantity_base"] * sell_fill_price(price) * (1 - FEE)
+                ticker = coinbase_client.get_public_ticker(coinbase_client.to_product_id(pos["pair"]))
+                mark_value += pos["quantity_base"] * taker_sell_fill(ticker["bid"]) * (1 - TAKER_FEE)
             except Exception as err:
                 print(f"[auto_trader] run {run_id}: ne mogu dohvatiti cijenu za {pos['pair']} ({err}) - zadržavam zadnju procjenu.")
                 mark_value += pos["entry_eur"]  # konzervativna zamjena ako cijena trenutno nedostupna
@@ -110,12 +110,12 @@ def _tick(run_id: int) -> None:
             if not pred or pred["decision"] not in SELL_CATEGORIES:
                 continue
             try:
-                price = coinbase_client.get_public_price(coinbase_client.to_product_id(pos["pair"]))
+                ticker = coinbase_client.get_public_ticker(coinbase_client.to_product_id(pos["pair"]))
             except Exception as err:
                 print(f"[auto_trader] run {run_id}: ne mogu prodati {pos['pair']} ({err}) - pokušat ću sljedeći tick.")
                 continue
-            fill = sell_fill_price(price)
-            proceeds = pos["quantity_base"] * fill * (1 - FEE)
+            fill = taker_sell_fill(ticker["bid"])
+            proceeds = pos["quantity_base"] * fill * (1 - TAKER_FEE)
             cash += proceeds
             conn.execute(
                 "UPDATE auto_trader_position SET closed_at=?, exit_price=?, exit_eur=? WHERE id=?",
@@ -144,12 +144,12 @@ def _tick(run_id: int) -> None:
             if amount_eur < 1.0:  # premalo da ima smisla (naknade bi pojele poziciju)
                 break
             try:
-                price = coinbase_client.get_public_price(coinbase_client.to_product_id(pair))
+                ticker = coinbase_client.get_public_ticker(coinbase_client.to_product_id(pair))
             except Exception as err:
                 print(f"[auto_trader] run {run_id}: ne mogu kupiti {pair} ({err}) - preskačem.")
                 continue
-            fill = buy_fill_price(price)
-            quantity = (amount_eur * (1 - FEE)) / fill
+            fill = taker_buy_fill(ticker["ask"])
+            quantity = (amount_eur * (1 - TAKER_FEE)) / fill
             cash -= amount_eur
             conn.execute(
                 "INSERT INTO auto_trader_position (run_id, pair, quantity_base, entry_price, entry_eur, opened_at)"

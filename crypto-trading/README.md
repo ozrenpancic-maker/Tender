@@ -612,6 +612,35 @@ testirane** — ovo razvojno okruženje nema izlazni pristup internetu. Prije st
    simboli poput `^spx`/`^dji`/`^ndq`).
 3. Pokreni paper trading i prati barem nekoliko dana/tjedana prije nego vjeruješ signalima.
 
+## Realniji troškovni model za uživo simulaciju (`app/costs.py`, `app/coinbase_client.get_public_ticker`)
+
+Korisnik je proslijedio stručan savjet (ChatGPT) o troškovnom modelu: koristiti stvaran Coinbase
+bid/ask umjesto jedne "slippage" pretpostavke, razlikovati maker/taker naknadu, i ne pretpostaviti
+izvršenje samo zato što je cijena "dotaknuta" na svijeći.
+
+- **Što je popravljeno**: `get_public_ticker()` sad dohvaća stvaran bid/ask s Coinbasea (ne samo
+  zadnju cijenu trgovanja). Paper trading i auto-trader za TAKER izvršenje sad plaćaju stvarni
+  ask (kupnja) / bid (prodaja), plus malen preostali slippage (0,05%) za kašnjenje odluka→izvršenje
+  koje spread/dubina knjige još ne pokriva - umjesto stare pretpostavke "cijena ± 0,1%" koja nije
+  znala stvaran trenutni spread.
+- **Novo: maker/post-only način izvršenja** (izbor pri pokretanju paper trading runa, odjeljak 9):
+  nalog se postavlja NA trenutni bid (kupnja) / ask (prodaja), ne prelazi spread. Svaki sljedeći
+  tick (5 min) provjerava je li tržište stvarno došlo do te cijene - ako da, ispunjen je (jeftinija
+  maker naknada, bez dodatnog slippagea); ako ne nakon 15 min (3 ticka), nalog ISTEKNE neispunjen i
+  prilika se gubi (ne juri se za tržištem). Ovo izravno adresira "dodir cijene na svijeći sam po
+  sebi ne potvrđuje izvršenje".
+- **MAKER_FEE/TAKER_FEE su i dalje ORIJENTACIJSKI** (0,4%/0,6%) - Coinbase Advanced Trade ima razine
+  po 30-dnevnom volumenu koje se mijenjaju, nisu uživo provjerene protiv tvog stvarnog računa (vidi
+  coinbase.com/advanced-fees). Prije ozbiljnog korištenja provjeri svoj trenutni cjenik i po potrebi
+  izmijeni konstante u `app/costs.py`.
+- **Što NIJE popravljeno (strukturno ograničenje, ne nedostatak truda)**: HISTORIJSKI backtest
+  (odjeljak 4, Optimizator) i dalje koristi staru fiksnu slippage pretpostavku na OHLC svijećama -
+  povijesni bid/ask podaci (dubina knjige kroz vrijeme) se nikad nisu sakupljali, pa se ne mogu
+  rekonstruirati unatrag. Realnije izvršenje je zato dostupno SAMO za uživo simulaciju (paper
+  trading, auto-trader), ne za backtest na povijesnim podacima. Djelomična ispunjenja (dio naloga
+  po jednoj cijeni, ostatak po drugoj) također nisu modelirana - maker nalog je sad ili potpuno
+  ispunjen ili potpuno istekne, ne djelomično.
+
 ## Automatizirani paper trading (AI bira coin) (`app/auto_trader.py`, dashboard odjeljak 10)
 
 Korisnik je tražio automatizirano trgovanje gdje aplikacija sama bira koji coin kupiti/prodati,

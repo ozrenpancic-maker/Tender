@@ -299,6 +299,13 @@
         </select>
       </div>
       <div class="field">
+        <label>Izvršenje naloga</label>
+        <select id="ppExecutionMode">
+          <option value="taker">Taker (odmah, pravi bid/ask + ~0,6% naknada)</option>
+          <option value="maker_post_only">Maker/post-only (čeka ispunjenje do 15 min, ~0,4% naknada)</option>
+        </select>
+      </div>
+      <div class="field">
         <label>Virtualna sredstva (EUR)</label>
         <input type="number" id="ppBalance" value="500" />
       </div>
@@ -306,7 +313,7 @@
     </div>
     <table id="ppTable" style="display:none">
       <thead>
-        <tr><th>#</th><th>Strategija</th><th>Par</th><th>Interval</th><th>Status</th><th>Trenutni saldo</th><th>Akcija</th></tr>
+        <tr><th>#</th><th>Strategija</th><th>Par</th><th>Interval</th><th>Izvršenje</th><th>Status</th><th>Trenutni saldo</th><th>Akcija</th></tr>
       </thead>
       <tbody></tbody>
     </table>

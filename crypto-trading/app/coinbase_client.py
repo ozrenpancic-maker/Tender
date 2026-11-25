@@ -31,6 +31,22 @@ def get_public_price(product_id: str) -> float:
     return float(price)
 
 
+def get_public_ticker(product_id: str) -> dict:
+    """Isti endpoint kao get_public_price, ali vraća i bid/ask (uživo potvrđeno da ih Coinbase
+    Exchange ticker vraća) - za realniju simulaciju izvršenja (vidi app/costs.py). Za HISTORIJSKI
+    backtest ovo NE postoji - povijesne OHLC svijeće nemaju bid/ask, samo uživo simulacija (paper
+    trading, auto-trader) može ovo koristiti."""
+    with httpx.Client(timeout=10) as client:
+        resp = client.get(f"{PUBLIC_BASE}/products/{product_id}/ticker")
+    if resp.status_code != 200:
+        raise CoinbaseError(f"HTTP {resp.status_code} od {PUBLIC_BASE}: {resp.text[:300]}")
+    data = resp.json()
+    price, bid, ask = data.get("price"), data.get("bid"), data.get("ask")
+    if price is None or bid is None or ask is None:
+        raise CoinbaseError(f"Odgovor nema price/bid/ask: {data}")
+    return {"price": float(price), "bid": float(bid), "ask": float(ask)}
+
+
 def to_product_id(pair: str) -> str:
     """'BTC/EUR' -> 'BTC-EUR' (format koji Coinbase koristi u URL-ovima). 'XXX/USDT' -> 'XXX-USD'
     jer Coinbase NEMA -USDT par za svaki coin u portfelju - provjereno uživo: SUI, PEPE, POL i ALGO

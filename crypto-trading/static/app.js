@@ -447,11 +447,12 @@ document.getElementById("ppStart").addEventListener("click", async () => {
   const pair = document.getElementById("ppPair").value;
   const starting_balance = Number(document.getElementById("ppBalance").value);
   const interval_min = Number(document.getElementById("ppInterval").value);
+  const execution_mode = document.getElementById("ppExecutionMode").value;
   try {
     await api("/api/paper/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ strategy, pair, starting_balance, interval_min }),
+      body: JSON.stringify({ strategy, pair, starting_balance, interval_min, execution_mode }),
     });
     refreshPaperRuns();
   } catch (err) {
@@ -467,8 +468,9 @@ async function refreshPaperRuns() {
   for (const run of runs) {
     const label = (STRATEGIES.find((s) => s.key === run.strategy) || {}).label || run.strategy;
     const intervalLabel = run.interval_min === 60 ? "satno" : "dnevno";
+    const execLabel = run.execution_mode === "maker_post_only" ? "maker" : "taker";
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${run.id}</td><td>${label}</td><td>${run.pair}</td><td>${intervalLabel}</td><td>${run.status}</td>
+    tr.innerHTML = `<td>${run.id}</td><td>${label}</td><td>${run.pair}</td><td>${intervalLabel}</td><td>${execLabel}</td><td>${run.status}</td>
       <td>${fmtEur(run.current_equity_eur)}</td><td></td>`;
     const actionCell = tr.querySelector("td:last-child");
     const viewBtn = document.createElement("button");
@@ -495,8 +497,12 @@ async function refreshPaperRuns() {
 async function showPaperDetail(runId) {
   const { run, trades } = await api(`/api/paper/${runId}`);
   const el = document.getElementById("ppDetail");
+  const pendingLine = run.pending_side
+    ? `<p><span class="pill">Nalog na čekanju</span> ${run.pending_side === "buy" ? "kupnja" : "prodaja"} @ ${fmtEur(run.pending_limit_price)} - čeka ispunjenje (maker)</p>`
+    : "";
   el.innerHTML = `<h3>Run #${run.id} — ${run.pair}</h3>
-    <p class="muted">Pokrenut ${new Date(run.started_at * 1000).toLocaleString("hr-HR")}. ${trades.length} trgovina.</p>`;
+    <p class="muted">Pokrenut ${new Date(run.started_at * 1000).toLocaleString("hr-HR")}. ${trades.length} trgovina.</p>
+    ${pendingLine}`;
   if (trades.length) {
     const list = document.createElement("table");
     list.innerHTML = `<thead><tr><th>Kad</th><th>Strana</th><th>Cijena</th></tr></thead><tbody>${trades

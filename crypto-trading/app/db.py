@@ -36,3 +36,14 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE paper_run ADD COLUMN interval_min INTEGER NOT NULL DEFAULT 1440")
     except sqlite3.OperationalError:
         pass  # stupac već postoji
+    for ddl in [
+        "ALTER TABLE paper_run ADD COLUMN execution_mode TEXT NOT NULL DEFAULT 'taker'",
+        "ALTER TABLE paper_run ADD COLUMN pending_side TEXT",
+        "ALTER TABLE paper_run ADD COLUMN pending_limit_price REAL",
+        "ALTER TABLE paper_run ADD COLUMN pending_posted_at INTEGER",
+        "ALTER TABLE paper_run ADD COLUMN pending_ticks INTEGER NOT NULL DEFAULT 0",
+    ]:
+        try:
+            conn.execute(ddl)
+        except sqlite3.OperationalError:
+            pass  # stupac već postoji

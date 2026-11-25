@@ -338,12 +338,15 @@ class StartRunRequest(BaseModel):
     params: dict = {}
     starting_balance: float = 500.0
     interval_min: int = 1440  # 60 = satne svijeće (više trgovina dnevno), 1440 = dnevne (zadano)
+    execution_mode: str = "taker"  # "taker" (odmah, pravi bid/ask+fee) ili "maker_post_only" (čeka ispunjenje)
 
 
 @app.post("/api/paper/start")
 def paper_start(req: StartRunRequest):
     try:
-        run_id = paper_engine.start_run(req.strategy, req.params, req.pair, req.starting_balance, req.interval_min)
+        run_id = paper_engine.start_run(
+            req.strategy, req.params, req.pair, req.starting_balance, req.interval_min, req.execution_mode
+        )
         return {"run_id": run_id}
     except ValueError as err:
         raise HTTPException(400, str(err))
