@@ -2,7 +2,11 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(ROOT / ".env")  # .env sam po sebi nije automatski učitan ni od uvicorna ni od Pythona
+
 DB_PATH = Path(os.environ.get("CRYPTO_DB_PATH", ROOT / "data" / "kripto.sqlite"))
 
 # NAPOMENA (KriptoMVP 4.4 nepromjenjiva pravila): aplikacija je isključivo savjetnik/simulator.
@@ -31,3 +35,6 @@ GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 
 # CryptoPanic - besplatan tier, registracija: cryptopanic.com/developers/api/
 CRYPTOPANIC_API_KEY = os.environ.get("CRYPTOPANIC_API_KEY", "")
+
+# Etherscan - besplatan tier (5 poziva/s), registracija: etherscan.io/apis
+ETHERSCAN_API_KEY = os.environ.get("ETHERSCAN_API_KEY", "")

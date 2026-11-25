@@ -838,6 +838,65 @@ auto-trader prije njega** - promatraj ga, ne vjeruj mu unaprijed. Zadane vrijedn
 (`min_hold_periods=6`, bez profit cilja, stop-loss prazan ali preporučen) su razumne pretpostavke,
 ne rezultat ikakve optimizacije.
 
+## Whale mirror (`app/whale_mirror.py`, `app/etherscan_client.py`, dashboard odjeljak 11)
+
+Korisnik je tražio "praćenje kitova" i/ili "kopiranje javnih portfelja" - dvije ideje koje su prvo
+istražene i odbačene u izvornom obliku, a onda izgrađene u jedinom obliku koji je stvarno poštena i
+izvediva verzija:
+
+- **"Kopiraj anonimnog trgovca s burze" NIJE izvedivo na legitiman način.** Binance/Bybit/OKX ne
+  objavljuju tuđe pozicije kao pravi, dokumentirani API - njihove "leaderboard" stranice su
+  neslužbeni, interni pozivi koje njihov JavaScript radi, bez ugovora o stabilnosti. Uživo testirano
+  (25.11.2026.): direktno pogađanje tih putanja vraća 404 (putanje se mijenjaju bez najave), a
+  pokušaj da se stvarna putanja nađe inspekcijom njihove stranice je OVO razvojno okruženje samo
+  blokiralo kao neovlašteni pristup - ispravna zaštita, ne slučajnost. Čak i kad bi se put našao, ne
+  postoji besplatna povijest tuđih pozicija za pravi backtest - samo trenutno stanje.
+- **Pravi, stabilan, dokumentiran i besplatan put**: javni on-chain podaci. Stanje ETH novčanika je
+  PO DEFINICIJI javan podatak u lančanom registru - nema tu ničije privatnosti za narušiti, za
+  razliku od pokušaja čitanja tuđih burzovnih pozicija. Etherscan nudi besplatan, dokumentiran,
+  stabilan API (v2, `chainid` parametar) - uživo testirano s korisnikovim besplatnim ključem,
+  radi normalno iz ovog sandboxa (za razliku od Binance/CoinGecko/FRED/Reddit koji su odavde
+  blokirani).
+
+### Kako radi
+
+Svakih 10 minuta (`POLL_INTERVAL_SECONDS` u `app/whale_mirror.py`) provjeri trenutno ETH stanje
+praćene javne adrese i usporedi sa zadnje zabilježenim stanjem:
+
+- stanje poraslo za barem `threshold_pct` (npr. 3%) i NISMO u poziciji -> **kupi** (zrcali
+  "akumulaciju")
+- stanje palo za barem `threshold_pct` i JESMO u poziciji -> **prodaj** (zrcali "distribuciju")
+- inače ništa
+
+Svaka trgovina je sve-ili-ništa (cijela gotovina/pozicija) - kopira se SMJER, ne iznos (praćeni
+novčanik je reda veličine $10k-$1M+, naš simulirani bot $100-1000 - proporcionalno kopiranje iznosa
+ne bi imalo smisla). Zadana adresa u dashboardu je Ethereum Foundationina javna adresa
+(`0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe`, javno objavljena u njihovim izvještajima
+transparentnosti) - bilo koja druga javna ETH adresa može se unijeti ručno.
+
+### Pošteno ograničenje - OVO JE HEURISTIKA, NE PROVJEREN SIGNAL
+
+Balans adrese se mijenja iz mnogo razloga koji nemaju veze s "trgovanjem": naknade za obične
+transakcije (gas), premještanje sredstava između vlastitih novčanika, staking, kupnja NFT-ova...
+Etherscan ne daje (barem ne na besplatnom tieru) razlog ZAŠTO se balans promijenio, samo da jest.
+`threshold_pct` filtrira sitan šum (gas naknade su obično mali dio balansa), ali ne može razlikovati
+"kupio je ETH jer vjeruje da će rasti" od "premjestio je ETH u drugi svoj novčanik". Ovo je proxy za
+whale AKTIVNOST, ne dokazan trgovački signal - tretiraj ga kao takvog.
+
+**NEMA POVIJESNOG BACKTESTA.** Etherscan daje SAMO trenutno stanje i popis transakcija - ne postoji
+besplatan način da se sazna "kakvo je bilo stanje ove adrese prije 30 dana" bez ručnog prolaska kroz
+svaku transakciju unatrag (skupo, nije napravljeno). Ovo je čisto uživo praćenje od trenutka
+pokretanja nadalje, isto neprovjereno kao i auto-trader kad je prvi put pokrenut - promatraj ga, ne
+vjeruj mu unaprijed.
+
+### Postavljanje
+
+Treba besplatan Etherscan API ključ (`etherscan.io/apis`) u `.env` (`ETHERSCAN_API_KEY`). Bez njega
+ovaj dio dashboarda jednostavno ne radi, ostatak aplikacije radi normalno. Napomena: ovaj projekt do
+sada NIJE automatski učitavao `.env` (nedostajao je `python-dotenv` + `load_dotenv()` poziv u
+`app/config.py` - popravljeno ovom prilikom, pogađa SVE postojeće `.env` ključeve, ne samo
+Etherscan).
+
 ## Stepenice (`app/strategies/stair_step_swing.py`) - pošten nalaz
 
 Korisnik je tražio bota koji "lovi stepenice": u uzlaznom trendu cijena malo raste pa malo padne pa

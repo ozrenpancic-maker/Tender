@@ -426,6 +426,53 @@
     <div id="atDetail"></div>
   </section>
 
+  <section data-tab="trgovanje">
+    <h2>11. Whale mirror (zrcali javni on-chain novčanik)</h2>
+    <details class="info-toggle">
+      <summary>Što ovo znači</summary>
+      <p class="muted">
+        Prati JAVNO stanje nekog ETH novčanika (balans je po definiciji javan podatak na lancu -
+        preko besplatnog Etherscan API-ja) i zrcali SMJER promjene u simuliranom portfelju: stanje
+        novčanika poraslo iznad praga -&gt; kupi, palo ispod praga -&gt; prodaj. Iznos se NE kopira
+        proporcionalno (novčanik je reda veličine $10k-$1M+, naš bot je $100-1000) - kopira se samo
+        smjer, uvijek sve-ili-ništa. Isključivo uživo, bez pravog novca.
+      </p>
+      <p class="muted">
+        <strong>Pošteno ograničenje:</strong> balans se mijenja i iz razloga koji nemaju veze s
+        "trgovanjem" (naknade za obične transakcije, premještanje između vlastitih novčanika,
+        staking...). Ovo je heuristički proxy za whale aktivnost, ne provjeren signal. Nema
+        povijesnog backtesta - ne postoji besplatan izvor povijesnih stanja/velikih transakcija za
+        proizvoljnu adresu (vidi README).
+      </p>
+    </details>
+    <div class="row">
+      <div class="field">
+        <label>Oznaka (slobodan opis)</label>
+        <input type="text" id="wmLabel" value="Ethereum Foundation" />
+      </div>
+      <div class="field">
+        <label>ETH adresa</label>
+        <input type="text" id="wmAddress" value="0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe" style="width: 24em" />
+      </div>
+      <div class="field">
+        <label>Virtualna sredstva ($)</label>
+        <input type="number" id="wmBalance" value="100" />
+      </div>
+      <div class="field">
+        <label>Prag promjene (%)</label>
+        <input type="number" id="wmThreshold" value="3" min="1" max="50" />
+      </div>
+      <button id="wmStart">Pokreni whale mirror</button>
+    </div>
+    <table id="wmTable" style="display:none">
+      <thead>
+        <tr><th>#</th><th>Oznaka</th><th>Status</th><th>Trenutna vrijednost</th><th>U poziciji</th><th>Akcija</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div id="wmDetail"></div>
+  </section>
+
 
 </main>
 <script src="/app.js"></script>

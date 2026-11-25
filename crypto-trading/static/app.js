@@ -122,7 +122,7 @@ const AUTO_REFRESH_MS = 60000; // sve što je dolje je čisto čitanje (GET), be
 async function refreshAll() {
   // Promise.allSettled (ne Promise.all) - jedna sekcija koja ne uspije (npr. API ključ istekao)
   // ne smije spriječiti da se ostale ažuriraju niti srušiti periodični setInterval poziv.
-  await Promise.allSettled([refreshPredictions(), refreshSignals(), refreshPaperRuns(), refreshAutoTraderRuns()]);
+  await Promise.allSettled([refreshPredictions(), refreshSignals(), refreshPaperRuns(), refreshAutoTraderRuns(), refreshWhaleMirrorRuns()]);
   const el = document.getElementById("lastRefreshedAt");
   if (el) el.textContent = `Zadnje osvježeno: ${new Date().toLocaleTimeString("hr-HR")}`;
 }
@@ -677,6 +677,80 @@ async function showAutoTraderDetail(runId) {
       .map(
         (t) =>
           `<tr><td>${new Date(t.executed_at * 1000).toLocaleString("hr-HR")}</td><td>${t.pair}</td><td>${t.side}</td><td>${fmtEur(t.price)}</td><td>${t.ai_score ?? "-"}</td><td>${t.decision ?? "-"}</td></tr>`,
+      )
+      .join("")}</tbody>`;
+    el.appendChild(list);
+  }
+}
+
+// ---------- Whale mirror (zrcali javni on-chain novčanik, uživo) ----------
+
+function fmtUsd(n) {
+  return `$${Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+}
+
+document.getElementById("wmStart").addEventListener("click", async () => {
+  const label = document.getElementById("wmLabel").value.trim() || "(bez oznake)";
+  const address = document.getElementById("wmAddress").value.trim();
+  const starting_balance = Number(document.getElementById("wmBalance").value);
+  const threshold_pct = Number(document.getElementById("wmThreshold").value) / 100;
+  try {
+    await api("/api/whale-mirror/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label, address, pair: "ETH/USDT", starting_balance, threshold_pct }),
+    });
+    refreshWhaleMirrorRuns();
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+async function refreshWhaleMirrorRuns() {
+  const { runs } = await api("/api/whale-mirror/runs");
+  const table = document.getElementById("wmTable");
+  const tbody = table.querySelector("tbody");
+  tbody.innerHTML = "";
+  for (const run of runs) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${run.id}</td><td>${run.label}</td><td>${run.status}</td>
+      <td>${fmtUsd(run.current_equity)}</td><td>${run.in_position ? "da" : "ne"}</td><td></td>`;
+    const actionCell = tr.querySelector("td:last-child");
+    const viewBtn = document.createElement("button");
+    viewBtn.className = "secondary";
+    viewBtn.textContent = "Detalji";
+    viewBtn.onclick = () => showWhaleMirrorDetail(run.id);
+    actionCell.appendChild(viewBtn);
+    if (run.status === "running") {
+      const stopBtn = document.createElement("button");
+      stopBtn.className = "danger-btn";
+      stopBtn.textContent = "Zaustavi";
+      stopBtn.style.marginLeft = "6px";
+      stopBtn.onclick = async () => {
+        await api(`/api/whale-mirror/${run.id}/stop`, { method: "POST" });
+        refreshWhaleMirrorRuns();
+      };
+      actionCell.appendChild(stopBtn);
+    }
+    tbody.appendChild(tr);
+  }
+  table.style.display = runs.length ? "table" : "none";
+}
+
+async function showWhaleMirrorDetail(runId) {
+  const { run, trades } = await api(`/api/whale-mirror/${runId}`);
+  const el = document.getElementById("wmDetail");
+  el.innerHTML = `<h3>Run #${run.id} — ${run.label}</h3>
+    <p class="muted">Adresa: <code>${run.address}</code>. Pokrenut ${new Date(run.started_at * 1000).toLocaleString("hr-HR")}.
+    Prag: ${fmtPct(run.threshold_pct * 100)}. Gotovina: ${fmtUsd(run.cash)}. ${trades.length} trgovina.</p>`;
+  if (trades.length) {
+    const list = document.createElement("table");
+    list.innerHTML = `<thead><tr><th>Kad</th><th>Strana</th><th>Cijena</th><th>Iznos</th><th>Whale stanje (ETH)</th><th>Promjena</th></tr></thead><tbody>${trades
+      .slice()
+      .reverse()
+      .map(
+        (t) =>
+          `<tr><td>${new Date(t.executed_at * 1000).toLocaleString("hr-HR")}</td><td>${t.side}</td><td>${fmtUsd(t.price)}</td><td>${fmtUsd(t.amount_usd)}</td><td>${t.whale_balance_eth.toLocaleString("hr-HR", { maximumFractionDigits: 2 })}</td><td>${t.whale_delta_pct >= 0 ? "+" : ""}${fmtPct(t.whale_delta_pct * 100)}</td></tr>`,
       )
       .join("")}</tbody>`;
     el.appendChild(list);

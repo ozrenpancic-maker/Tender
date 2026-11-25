@@ -94,6 +94,46 @@ CREATE TABLE IF NOT EXISTS auto_trader_equity_point (
     PRIMARY KEY (run_id, at)
 );
 
+-- "Whale mirror" - zrcali promjene stanja JAVNOG on-chain novčanika (balans je po definiciji javan
+-- podatak u lančanom registru) - vidi app/whale_mirror.py i app/etherscan_client.py. UŽIVO SAMO,
+-- NEMA povijesnog backtesta (nema besplatnog izvora povijesnih "velikih transakcija" - vidi
+-- README). Simulacija, bez pravog novca (KriptoMVP 4.4 pravilo #2/#3).
+CREATE TABLE IF NOT EXISTS whale_mirror_run (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    label TEXT NOT NULL, -- slobodan opis (npr. "Ethereum Foundation")
+    address TEXT NOT NULL, -- javna ETH adresa koja se prati
+    pair TEXT NOT NULL DEFAULT 'ETH/USDT',
+    starting_balance REAL NOT NULL,
+    threshold_pct REAL NOT NULL, -- min. promjena stanja novčanika (npr. 0.03 = 3%) da se okine trgovina
+    cash REAL NOT NULL,
+    in_position INTEGER NOT NULL DEFAULT 0,
+    quantity_base REAL NOT NULL DEFAULT 0,
+    entry_price REAL,
+    last_whale_balance_wei TEXT, -- zadnje poznato stanje praćenog novčanika (string - prevelik za REAL bez gubitka preciznosti)
+    started_at INTEGER NOT NULL,
+    stopped_at INTEGER,
+    status TEXT NOT NULL DEFAULT 'running' -- running | stopped
+);
+
+CREATE TABLE IF NOT EXISTS whale_mirror_trade (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL REFERENCES whale_mirror_run(id),
+    side TEXT NOT NULL CHECK (side IN ('buy', 'sell')),
+    price REAL NOT NULL,
+    amount_usd REAL NOT NULL,
+    whale_balance_eth REAL NOT NULL, -- stanje praćenog novčanika u trenutku odluke
+    whale_delta_pct REAL NOT NULL, -- promjena stanja novčanika koja je okinula ovu trgovinu
+    executed_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS whale_mirror_equity_point (
+    run_id INTEGER NOT NULL REFERENCES whale_mirror_run(id),
+    at INTEGER NOT NULL,
+    equity REAL NOT NULL,
+    whale_balance_eth REAL,
+    PRIMARY KEY (run_id, at)
+);
+
 CREATE TABLE IF NOT EXISTS backtest_run (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     strategy TEXT NOT NULL,

@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app import binance_history_client, coinbase_client, config, db, equity_client, paper_engine
+from app import binance_history_client, coinbase_client, config, db, equity_client, etherscan_client, paper_engine
 from app.backtest import run_backtest
 from app.candles import available_pairs
 from app.macro_clients import MACRO_CLIENTS, all_labels, test_all_connections
@@ -37,9 +37,10 @@ async def require_api_key(request: Request, call_next):
 def on_startup():
     db.ensure_schema()
     paper_engine.resume_running_on_startup()
-    from app import auto_trader
+    from app import auto_trader, whale_mirror
 
     auto_trader.resume_running_on_startup()
+    whale_mirror.resume_running_on_startup()
 
 
 # ---------- Strategije / parovi ----------
@@ -483,6 +484,76 @@ def auto_trader_detail(run_id: int):
             "positions": [dict(p) for p in positions],
             "equity_curve": [dict(e) for e in equity],
         }
+    finally:
+        conn.close()
+
+
+# ---------- Whale mirror (zrcali javni on-chain novčanik, UŽIVO, bez backtesta) ----------
+
+class WhaleMirrorStartRequest(BaseModel):
+    label: str = "Ethereum Foundation"
+    address: str = "0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe"
+    pair: str = "ETH/USDT"
+    starting_balance: float = 100.0
+    threshold_pct: float = 0.03  # 3% promjene stanja novčanika da se okine trgovina
+
+
+@app.post("/api/whale-mirror/start")
+def whale_mirror_start(req: WhaleMirrorStartRequest):
+    from app import whale_mirror
+
+    try:
+        run_id = whale_mirror.start_run(req.label, req.address, req.pair, req.starting_balance, req.threshold_pct)
+        return {"run_id": run_id}
+    except (ValueError, etherscan_client.EtherscanError) as err:
+        raise HTTPException(400, str(err))
+
+
+@app.post("/api/whale-mirror/{run_id}/stop")
+def whale_mirror_stop(run_id: int):
+    from app import whale_mirror
+
+    whale_mirror.stop_run(run_id)
+    return {"ok": True}
+
+
+@app.get("/api/whale-mirror/runs")
+def whale_mirror_runs():
+    conn = db.get_connection()
+    try:
+        rows = conn.execute("SELECT * FROM whale_mirror_run ORDER BY started_at DESC").fetchall()
+        runs = []
+        for r in rows:
+            run = dict(r)
+            last_point = conn.execute(
+                "SELECT equity, at FROM whale_mirror_equity_point WHERE run_id=? ORDER BY at DESC LIMIT 1", (run["id"],)
+            ).fetchone()
+            run["current_equity"] = last_point["equity"] if last_point else run["starting_balance"]
+            run["last_update_at"] = last_point["at"] if last_point else None
+            runs.append(run)
+        return {"runs": runs}
+    finally:
+        conn.close()
+
+
+@app.get("/api/whale-mirror/test-connection")
+def whale_mirror_test_connection():
+    try:
+        return etherscan_client.test_connection()
+    except etherscan_client.EtherscanError as err:
+        raise HTTPException(400, str(err))
+
+
+@app.get("/api/whale-mirror/{run_id}")
+def whale_mirror_detail(run_id: int):
+    conn = db.get_connection()
+    try:
+        run = conn.execute("SELECT * FROM whale_mirror_run WHERE id=?", (run_id,)).fetchone()
+        if not run:
+            raise HTTPException(404, "Run nije pronađen.")
+        trades = conn.execute("SELECT * FROM whale_mirror_trade WHERE run_id=? ORDER BY executed_at", (run_id,)).fetchall()
+        equity = conn.execute("SELECT * FROM whale_mirror_equity_point WHERE run_id=? ORDER BY at", (run_id,)).fetchall()
+        return {"run": dict(run), "trades": [dict(t) for t in trades], "equity_curve": [dict(e) for e in equity]}
     finally:
         conn.close()
 
