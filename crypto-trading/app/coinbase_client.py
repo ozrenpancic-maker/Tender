@@ -32,8 +32,16 @@ def get_public_price(product_id: str) -> float:
 
 
 def to_product_id(pair: str) -> str:
-    """'BTC/EUR' -> 'BTC-EUR' (format koji Coinbase koristi u URL-ovima)."""
-    return pair.replace("/", "-")
+    """'BTC/EUR' -> 'BTC-EUR' (format koji Coinbase koristi u URL-ovima). 'XXX/USDT' -> 'XXX-USD'
+    jer Coinbase NEMA -USDT par za svaki coin u portfelju - provjereno uživo: SUI, PEPE, POL i ALGO
+    postoje na Coinbaseu SAMO kao -USD, ne -USDT (vraćaju HTTP 404 na -USDT), dok npr. BTC/XRP/DOGE/
+    NEAR imaju oba pa se razlika dosad nije primijetila. USDT≈USD pretpostavka je ovdje sigurna jer
+    se Coinbase cijena koristi SAMO za live fill cijenu (ML značajke/label i dalje koriste stvarne
+    USDT podatke s Binancea - vidi README 'Uživo dohvat podataka')."""
+    base, quote = pair.split("/")
+    if quote == "USDT":
+        quote = "USD"
+    return f"{base}-{quote}"
 
 
 VALID_GRANULARITIES = {60, 300, 900, 3600, 21600, 86400}  # 1min/5min/15min/1h/6h/1d - Coinbase ne nudi 4h izravno

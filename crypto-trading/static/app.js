@@ -81,10 +81,26 @@ async function init() {
     tradable.map((s) => s.key),
     tradable.reduce((acc, s) => ({ ...acc, [s.key]: s.label }), {}),
   );
-  await refreshPaperRuns();
-  await refreshAutoTraderRuns();
   await renderMacroSyncRows();
+  await refreshAll();
+  setInterval(refreshAll, AUTO_REFRESH_MS);
 }
+
+// ---------- Globalno osvježavanje (bez ručnog klikanja po svakoj sekciji) ----------
+
+const AUTO_REFRESH_MS = 60000; // sve što je dolje je čisto čitanje (GET), bez mrežnih troškova/sync-a
+
+async function refreshAll() {
+  // Promise.allSettled (ne Promise.all) - jedna sekcija koja ne uspije (npr. API ključ istekao)
+  // ne smije spriječiti da se ostale ažuriraju niti srušiti periodični setInterval poziv.
+  await Promise.allSettled([refreshPredictions(), refreshSignals(), refreshPaperRuns(), refreshAutoTraderRuns()]);
+  const el = document.getElementById("lastRefreshedAt");
+  if (el) el.textContent = `Zadnje osvježeno: ${new Date().toLocaleTimeString("hr-HR")}`;
+}
+
+document.getElementById("refreshAllBtn").addEventListener("click", () => {
+  refreshAll().catch((err) => alert("Greška pri osvježavanju: " + err.message));
+});
 
 function fillSelect(id, values, labels) {
   const el = document.getElementById(id);
@@ -742,9 +758,6 @@ async function refreshPredictions() {
 document.getElementById("predRefresh").addEventListener("click", refreshPredictions);
 
 init();
-setInterval(refreshPaperRuns, 30000);
-refreshSignals();
-refreshPredictions();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

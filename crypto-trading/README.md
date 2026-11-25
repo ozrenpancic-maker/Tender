@@ -130,6 +130,14 @@ EMA-udaljenost...), nikad apsolutna cijena u određenoj valuti. Coinbase nema iz
 granulaciju - za "4h" horizont dohvate se 1h svijeće (paginirano, Coinbase ograničava na ~300
 svijeća po pozivu) i agregiraju u 4h (`resample_candles`).
 
+**Popravljena greška (bila je stvarni uzrok "404" grešaka koje su se vidjele u produkciji)**:
+`app/coinbase_client.to_product_id()` je prije samo radio `pair.replace("/", "-")`, tj. 'SUI/USDT'
+-> 'SUI-USDT' - ali Coinbase **nema** -USDT par za svaki coin u portfelju. Uživo provjereno: SUI,
+PEPE, POL i ALGO postoje na Coinbaseu SAMO kao -USD (vraćaju HTTP 404 na -USDT), dok BTC/XRP/DOGE/
+NEAR imaju oba pa se razlika dosad nije primijetila. Funkcija sad uvijek zamijeni USDT→USD prije
+slanja Coinbaseu (isto što `app/signals.py` već radi nezavisno) - ovo je popravilo live cijene za
+Paper trading i Automatizirani paper trading na ta četiri coina.
+
 ## Signali kupi/prodaj (`app/signals.py`, dashboard odjeljak 2)
 
 Korisnik je tražio da aplikacija izravno kaže "kad kupiti koji kripto i kada prodati", u dva
@@ -549,6 +557,13 @@ uvicorn app.main:app --reload --port 8010
 
 Otvori [http://localhost:8010](http://localhost:8010).
 
+**Dashboard se sad sam osvježava** - "AI Prediction Engine", "Signali kupi/prodaj", "Paper trading"
+i "Automatizirani paper trading" se učitaju automatski pri otvaranju stranice (ne treba više ručno
+kliknuti "Osvježi" u svakoj sekciji posebno) i ponovno svakih 60 sekundi dok je stranica otvorena.
+Gumb "Osvježi sve" u zaglavlju odmah pokreće sve četiri odjednom. Testovi veze i sinkronizacije
+(Coinbase, Wall Street, makro izvori, Binance povijest) ostaju ručni - to su mrežno/vremenski skuplje
+radnje s nuspojavama (upis u bazu), namjerno se ne pokreću same.
+
 ## Android (instalacija na telefon preko lokalne mreže)
 
 Dashboard je postavljen kao PWA (manifest + ikone + service worker, vidi `static/manifest.json` i
@@ -689,8 +704,13 @@ odjeljku 10 znači autonomna ODLUKA unutar simulacije, ne pravi nalog - vidi pog
   novac - uključene su kao alat za daljnje istraživanje, ne kao preporuka (vidi "Stepenice - pošten
   nalaz" iznad za potpun rezultat potonje).
 - "Wall Street"/zlato podaci pokrivaju tri indeksa i zlato preko Stooq-a, dnevna rezolucija. Stooq
-  simboli (`^spx`, `^dji`, `^ndq`, `xauusd`) nisu uživo potvrđeni - ako "Testiraj vezu" javi grešku
-  za neki od njih, ispravi simbol u `app/equity_client.py` (`INDEX_SYMBOLS`).
+  simboli (`^spx`, `^dji`, `^ndq`, `xauusd`) su standardna Stooq notacija, ali **nisu uživo
+  potvrđeni IZ OVOG razvojnog okruženja** - direktan test odavde dobiva HTTP 404/connection reset
+  na SVE simbole bez iznimke (čak i na `^spx` za koji smo prilično sigurni da je ispravan), što
+  upućuje na Stooqov anti-bot/rate-limit filter na ovoj (dijeljenoj/proxy) mrežnoj adresi, ne na
+  pogrešne simbole. Pokreni "Testiraj vezu" (odjeljak Wall Street) sa stvarnog servera (kućna/druga
+  IP adresa) da dobiješ pouzdan odgovor - ako SE i dalje javi 404 baš ondje, tek tada ispravi simbol
+  u `app/equity_client.py` (`INDEX_SYMBOLS`).
 - Korelacija kripta/dioničko tržište/zlato koju `equity_filtered` i `multi_macro_filter` pokušavaju
   iskoristiti je poznata pojava zadnjih godina, ali nije fizikalni zakon - može oslabiti ili nestati.
 - Optimizator pretražuje unaprijed zadane mreže parametara (`app/optimizer.py`, `DEFAULT_GRIDS`) -
