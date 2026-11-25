@@ -42,6 +42,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
         "ALTER TABLE paper_run ADD COLUMN pending_limit_price REAL",
         "ALTER TABLE paper_run ADD COLUMN pending_posted_at INTEGER",
         "ALTER TABLE paper_run ADD COLUMN pending_ticks INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE paper_run ADD COLUMN daily_loss_limit_pct REAL",
+        "ALTER TABLE paper_run ADD COLUMN day_start_equity REAL",
+        "ALTER TABLE paper_run ADD COLUMN day_start_date TEXT",
+        "ALTER TABLE paper_run ADD COLUMN daily_halted INTEGER NOT NULL DEFAULT 0",
     ]:
         try:
             conn.execute(ddl)

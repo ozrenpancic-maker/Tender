@@ -35,16 +35,30 @@ def get_public_ticker(product_id: str) -> dict:
     """Isti endpoint kao get_public_price, ali vraća i bid/ask (uživo potvrđeno da ih Coinbase
     Exchange ticker vraća) - za realniju simulaciju izvršenja (vidi app/costs.py). Za HISTORIJSKI
     backtest ovo NE postoji - povijesne OHLC svijeće nemaju bid/ask, samo uživo simulacija (paper
-    trading, auto-trader) može ovo koristiti."""
+    trading, auto-trader) može ovo koristiti.
+
+    `age_seconds`: koliko je star Coinbaseov 'time' (zadnja trgovina) u odnosu na SAD - koristi se
+    za otkrivanje "zastarjelih kotacija" (ChatGPT savjet, točka 4) kad feed vraća uspješan HTTP
+    odgovor, ali sa starim/zamrznutim podatkom (npr. par bez prometa, ili problem na Coinbaseovoj
+    strani koji nije prava mrežna greška)."""
+    import datetime
+
     with httpx.Client(timeout=10) as client:
         resp = client.get(f"{PUBLIC_BASE}/products/{product_id}/ticker")
     if resp.status_code != 200:
         raise CoinbaseError(f"HTTP {resp.status_code} od {PUBLIC_BASE}: {resp.text[:300]}")
     data = resp.json()
-    price, bid, ask = data.get("price"), data.get("bid"), data.get("ask")
+    price, bid, ask, ts = data.get("price"), data.get("bid"), data.get("ask"), data.get("time")
     if price is None or bid is None or ask is None:
         raise CoinbaseError(f"Odgovor nema price/bid/ask: {data}")
-    return {"price": float(price), "bid": float(bid), "ask": float(ask)}
+    age_seconds = None
+    if ts:
+        try:
+            trade_time = datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            age_seconds = (datetime.datetime.now(datetime.timezone.utc) - trade_time).total_seconds()
+        except ValueError:
+            pass
+    return {"price": float(price), "bid": float(bid), "ask": float(ask), "age_seconds": age_seconds}
 
 
 def to_product_id(pair: str) -> str:

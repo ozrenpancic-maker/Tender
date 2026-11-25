@@ -309,6 +309,10 @@
         <label>Virtualna sredstva (EUR)</label>
         <input type="number" id="ppBalance" value="500" />
       </div>
+      <div class="field">
+        <label>Dnevni limit gubitka % (prazno = isključeno)</label>
+        <input type="number" id="ppDailyLossLimit" placeholder="npr. 5" min="1" max="99" />
+      </div>
       <button id="ppStart">Pokreni paper run</button>
     </div>
     <table id="ppTable" style="display:none">

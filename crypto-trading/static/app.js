@@ -467,11 +467,13 @@ document.getElementById("ppStart").addEventListener("click", async () => {
   const starting_balance = Number(document.getElementById("ppBalance").value);
   const interval_min = Number(document.getElementById("ppInterval").value);
   const execution_mode = document.getElementById("ppExecutionMode").value;
+  const dailyLossLimitRaw = document.getElementById("ppDailyLossLimit").value.trim();
+  const daily_loss_limit_pct = dailyLossLimitRaw ? Number(dailyLossLimitRaw) / 100 : null;
   try {
     await api("/api/paper/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ strategy, pair, starting_balance, interval_min, execution_mode }),
+      body: JSON.stringify({ strategy, pair, starting_balance, interval_min, execution_mode, daily_loss_limit_pct }),
     });
     refreshPaperRuns();
   } catch (err) {
@@ -519,9 +521,12 @@ async function showPaperDetail(runId) {
   const pendingLine = run.pending_side
     ? `<p><span class="pill">Nalog na čekanju</span> ${run.pending_side === "buy" ? "kupnja" : "prodaja"} @ ${fmtEur(run.pending_limit_price)} - čeka ispunjenje (maker)</p>`
     : "";
+  const haltedLine = run.daily_halted
+    ? `<p><span class="pill fail">Pauziran do sutra</span> dnevni limit gubitka (${(run.daily_loss_limit_pct * 100).toFixed(1)}%) probijen - pozicija prisilno zatvorena, novi ulasci blokirani do novog dana.</p>`
+    : "";
   el.innerHTML = `<h3>Run #${run.id} — ${run.pair}</h3>
     <p class="muted">Pokrenut ${new Date(run.started_at * 1000).toLocaleString("hr-HR")}. ${trades.length} trgovina.</p>
-    ${pendingLine}`;
+    ${pendingLine}${haltedLine}`;
   if (trades.length) {
     const list = document.createElement("table");
     list.innerHTML = `<thead><tr><th>Kad</th><th>Strana</th><th>Cijena</th></tr></thead><tbody>${trades

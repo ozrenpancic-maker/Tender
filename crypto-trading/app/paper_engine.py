@@ -14,6 +14,7 @@ POLL_INTERVAL_SECONDS = 300  # provjera svakih 5 minuta; odluka se donosi samo k
 CANDLE_LOOKBACK_COUNT = 400  # margina za indikatore s dugim lookbackom (npr. SMA200, trend_period=100)
 MAKER_WAIT_TICKS = 3  # koliko ticka (5 min svaki = do 15 min) čekamo da se maker nalog ispuni prije isteka
 VALID_EXECUTION_MODES = {"taker", "maker_post_only"}
+STALE_QUOTE_SECONDS = 1800  # 30 min bez nove trgovine na Coinbaseu - velikodušno da ne lažno uzbunjuje na manje likvidnim parovima
 
 _active_runs: dict[int, threading.Event] = {}
 _lock = threading.Lock()
@@ -81,6 +82,46 @@ def _handle_pending_order(conn, run, bid: float, ask: float, now: int) -> None:
     conn.commit()
 
 
+def _check_daily_loss_limit(conn, run, equity_now: float, bid: float, position: float, now: int) -> bool:
+    """Dnevni limit gubitka kao ZASEBNO pravilo (ChatGPT savjet, točka 4) - prati equity (ne samo
+    realizirane trgovine), i ako je probijen, prisilno zatvara otvorenu poziciju (unaprijed
+    definiran uvjet izlaza), ne čeka da strategija sama odluči prodati. Vraća True ako je run
+    (novo ili već) zaustavljen za ostatak dana - pozivatelj onda preskače ostatak ticka."""
+    run_id = run["id"]
+    today = time.strftime("%Y-%m-%d", time.gmtime(now))
+
+    if run["day_start_date"] != today:
+        conn.execute(
+            "UPDATE paper_run SET day_start_equity=?, day_start_date=?, daily_halted=0 WHERE id=?",
+            (equity_now, today, run_id),
+        )
+        conn.commit()
+        return False  # novi dan - referentna točka je upravo postavljena, nema smisla odmah provjeravati
+
+    limit_pct = run["daily_loss_limit_pct"]
+    if limit_pct is None or run["daily_halted"]:
+        return bool(run["daily_halted"])
+
+    day_start_equity = run["day_start_equity"]
+    if day_start_equity and equity_now <= day_start_equity * (1 - limit_pct):
+        print(f"[paper_engine] run {run_id}: dnevni limit gubitka ({limit_pct * 100:.1f}%) probijen - zaustavljam nove ulaze do sutra.")
+        if position > 0:
+            fill = taker_sell_fill(bid)
+            new_cash = position * fill * (1 - TAKER_FEE)
+            conn.execute(
+                "INSERT INTO paper_trade (run_id, side, price, balance_after_eur, position_after_base, executed_at, note)"
+                " VALUES (?, 'sell', ?, ?, 0, ?, 'prisilan izlaz - dnevni limit gubitka')",
+                (run_id, fill, new_cash, now),
+            )
+        conn.execute(
+            "UPDATE paper_run SET daily_halted=1, pending_side=NULL, pending_limit_price=NULL, pending_posted_at=NULL, pending_ticks=0 WHERE id=?",
+            (run_id,),
+        )
+        conn.commit()
+        return True
+    return False
+
+
 def _tick(run_id: int) -> None:
     conn = db.get_connection()
     try:
@@ -105,7 +146,7 @@ def _tick(run_id: int) -> None:
             conn.commit()
             print(f"[paper_engine] run {run_id}: ne mogu dohvatiti cijenu ({err})")
             return
-        live_price, bid, ask = ticker["price"], ticker["bid"], ticker["ask"]
+        live_price, bid, ask, quote_age = ticker["price"], ticker["bid"], ticker["ask"], ticker.get("age_seconds")
 
         cash, position, in_position = _replay_state(conn, run_id)
         equity_now = cash + position * live_price
@@ -115,6 +156,17 @@ def _tick(run_id: int) -> None:
             (run_id, now, round(equity_now, 4), live_price),
         )
         conn.commit()
+
+        # Zastarjela kotacija (ChatGPT savjet, točka 4): Coinbase je uspješno odgovorio, ali 'time'
+        # (zadnja trgovina) je jako stara - moguć zamrznut feed. Pauziraj SVE odluke ovaj tick
+        # (uključujući pending nalog provjeru, jer bi i ta provjera koristila sumnjiv bid/ask) -
+        # equity točka iznad je svejedno zabilježena radi kontinuiteta grafa.
+        if quote_age is not None and quote_age > STALE_QUOTE_SECONDS:
+            print(f"[paper_engine] run {run_id}: kotacija zastarjela ({quote_age:.0f}s bez trgovine) - preskačem odluke ovaj tick.")
+            return
+
+        if _check_daily_loss_limit(conn, run, equity_now, bid, position, now):
+            return
 
         # Maker (post-only) nalog koji čeka ispunjenje provjerava se na SVAKI tick (ne samo kad
         # stigne nova svijeća) - nalog treba vidjeti pomak cijene što prije moguće. Dok nalog čeka,
@@ -211,7 +263,7 @@ VALID_INTERVALS_MIN = {60, 1440}  # 1h ili 1d (Coinbase javni feed ne nudi 4h iz
 
 def start_run(
     strategy_key: str, params: dict, pair: str, starting_balance: float, interval_min: int = 1440,
-    execution_mode: str = "taker",
+    execution_mode: str = "taker", daily_loss_limit_pct: float | None = None,
 ) -> int:
     if strategy_key not in GENERIC_STRATEGIES:
         raise ValueError(f"Strategija '{strategy_key}' nije podržana za paper trading.")
@@ -219,14 +271,21 @@ def start_run(
         raise ValueError(f"Nepodržan interval {interval_min} min. Dostupno: {sorted(VALID_INTERVALS_MIN)}")
     if execution_mode not in VALID_EXECUTION_MODES:
         raise ValueError(f"Nepodržan execution_mode '{execution_mode}'. Dostupno: {sorted(VALID_EXECUTION_MODES)}")
+    if daily_loss_limit_pct is not None and not 0 < daily_loss_limit_pct < 1:
+        raise ValueError("daily_loss_limit_pct mora biti između 0 i 1 (npr. 0.05 = 5%), ili izostavljen za isključeno.")
 
     conn = db.get_connection()
     try:
         full_params = {**GENERIC_STRATEGIES[strategy_key]["default_params"], **params}
+        today = time.strftime("%Y-%m-%d", time.gmtime())
         cur = conn.execute(
-            "INSERT INTO paper_run (strategy, params_json, pair, started_at, starting_balance_eur, status, mode, interval_min, execution_mode)"
-            " VALUES (?, ?, ?, ?, ?, 'running', 'paper', ?, ?)",
-            (strategy_key, json.dumps(full_params), pair, int(time.time()), starting_balance, interval_min, execution_mode),
+            "INSERT INTO paper_run (strategy, params_json, pair, started_at, starting_balance_eur, status, mode,"
+            " interval_min, execution_mode, daily_loss_limit_pct, day_start_equity, day_start_date)"
+            " VALUES (?, ?, ?, ?, ?, 'running', 'paper', ?, ?, ?, ?, ?)",
+            (
+                strategy_key, json.dumps(full_params), pair, int(time.time()), starting_balance, interval_min,
+                execution_mode, daily_loss_limit_pct, starting_balance, today,
+            ),
         )
         conn.commit()
         run_id = cur.lastrowid

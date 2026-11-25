@@ -646,6 +646,33 @@ out-of-sample/test brojke za VIŠE kombinacija nego što optimizator automatski 
 naknadno "bira" na temelju toga - kod strukturno pomaže (ne vraća sve kombinacije automatski), ali
 disciplina da se out-of-sample stvarno gleda samo jednom je i dalje na korisniku, ne (samo) na kodu.
 
+## Pauza bota vs zatvaranje pozicije (ChatGPT savjet, točka 4, prilagođeno simulaciji)
+
+Savjet je pretpostavljao PRAVO trgovanje (client_order_id idempotencija za prave naloge,
+usklađivanje s Coinbaseovim računom nakon reconnecta) - korisnik je odabrao prilagodbu simulaciji
+umjesto toga (vidi odjeljak "Isključivo savjetnik/simulator"). Ono što OSTAJE smisleno i bez pravog
+novca:
+
+- **Zastarjela kotacija**: Coinbase ponekad vrati uspješan HTTP odgovor, ali s davno zadnjom
+  trgovinom (npr. par bez prometa, ili problem na Coinbaseovoj strani koji nije prava mrežna
+  greška). `get_public_ticker()` sad vraća i `age_seconds` (koliko je star zadnji trgovinski
+  podatak) - ako je stariji od 30 min, `paper_engine` PAUZIRA sve odluke tog ticka (uključujući
+  maker nalog provjeru, ne samo nove ulaze) dok se kotacija ne osvježi, umjesto da odluči na
+  sumnjivom podatku.
+- **Dnevni limit gubitka** - NOVO polje pri pokretanju paper trading runa (odjeljak 9, opcionalno):
+  prati equity (ne samo realizirane trgovine) naspram vrijednosti na početku kalendarskog dana
+  (UTC). Ako gubitak probije zadani postotak, run **prisilno zatvara otvorenu poziciju** (taker
+  prodaja po stvarnom bidu, odmah - ne čeka da strategija sama odluči) i blokira nove ulaze do
+  idućeg dana, kad se referentna točka automatski resetira. Ovo je "zasebno pravilo s unaprijed
+  definiranim uvjetom izlaza" točno kako je savjetovano.
+- **Idempotencija bez client_order_id-a**: budući da nema pravih naloga, nema ni potrebe za
+  idempotentnim ID-om kod ponovnog slanja - stanje "nalog čeka ispunjenje" (`pending_side` u bazi,
+  ne u memoriji procesa) već sprječava dupli nalog na istu stranu čak i da server padne i restarta
+  se nasred čekanja (`resume_running_on_startup()` čita stanje iz baze, ne gubi ga).
+- **Usklađivanje s pravim Coinbase računom** - namjerno izostavljeno: simulacija nema pravi račun s
+  kojim bi se trebala uskladiti, njeno stanje se UVIJEK rekonstruira iz vlastitih zabilježenih
+  trgovina (`_replay_state`), pa "drift" naspram vanjskog sustava strukturno ne može nastati.
+
 ## Realniji troškovni model za uživo simulaciju (`app/costs.py`, `app/coinbase_client.get_public_ticker`)
 
 Korisnik je proslijedio stručan savjet (ChatGPT) o troškovnom modelu: koristiti stvaran Coinbase
