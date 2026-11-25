@@ -510,8 +510,11 @@ put stvarno POTVRĐENO da se projekt kompajlira i pakira u instalabilan APK.
   logistička regresija), `engine.py` (uživo predikcija, WAIT gate za nevalidirane horizonte). Vidi
   "AI Prediction Engine" iznad.
 - **`app/equity_client.py`** — dnevni podaci za S&P 500 / Dow / Nasdaq / zlato sa Stooq-a (javno,
-  bez ključa), za makro-filter strategije. `app/aux.py` poravnava kripto (trguje se 7 dana u tjednu)
+  bez ključa), za makro-filter strategije. `app/aux_candles.py` poravnava kripto (trguje se 7 dana u tjednu)
   i equity/zlato (zatvoreno vikendom) kalendare uzimanjem zadnje poznate cijene na/prije danog dana.
+  (Datoteka se zvala `app/aux.py` do 25.11.2026. - `aux` je rezervirano ime na Windowsu (kao `con`,
+  `prn`, `nul`), pa `git clone` nikad nije mogao zapisati tu datoteku na disk na Windows serveru -
+  nađeno uživo pri postavljanju korisnikovog Windows servera, preimenovano odmah.)
 - **`app/binance_history_client.py`** — povijest cijena za proizvoljan Binance par i interval
   (1d/4h/1h) preko REST API-ja, izravno u `candle` tablicu (source_id='binance') - isti oblik kao
   izvorni podaci. Geografski blokiran iz OVOG razvojnog okruženja (HTTP 451) - vidi
@@ -525,7 +528,7 @@ put stvarno POTVRĐENO da se projekt kompajlira i pakira u instalabilan APK.
 - **`app/indicators.py`** — čiste funkcije za EMA, MACD, Stochastic RSI, ROC, OBV, ATR, Bollinger
   Bands - bez vanjskih poziva, koriste ih `technical_composite` i `macro_signal_composite`.
 - **`app/macro_store.py`** + `macro_series` tablica — generička pohrana ne-OHLC serija (jedna
-  vrijednost po danu), zajednička za sve nove makro/sentiment izvore. `app/aux.py` ima odgovarajuće
+  vrijednost po danu), zajednička za sve nove makro/sentiment izvore. `app/aux_candles.py` ima odgovarajuće
   pomoćne funkcije (`series_value_on_or_before`, `series_change_pct`) za ovaj oblik podataka.
 - **`app/fred_client.py`**, **`app/defillama_client.py`**, **`app/coingecko_client.py`**,
   **`app/trends_client.py`**, **`app/reddit_client.py`**, **`app/etf_client.py`**,

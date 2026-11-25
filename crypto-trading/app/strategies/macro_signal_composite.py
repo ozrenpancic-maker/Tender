@@ -18,7 +18,7 @@ podatak nedostaje za taj dan, taj glas se jednostavno ne broji (ne pretvara se u
 Parametri: ema_trend, min_risk_on_votes, fed_lookback, reddit_threshold, regulatory_threshold,
 etf_threshold."""
 from app import indicators as ind
-from app.aux import series_change_pct, series_value_on_or_before
+from app.aux_candles import series_change_pct, series_value_on_or_before
 from app.strategies.base import Decision, StrategyContext
 
 NEEDS_SERIES = [

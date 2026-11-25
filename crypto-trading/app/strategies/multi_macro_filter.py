@@ -6,7 +6,7 @@
 Oba uvjeta moraju biti ispunjena da se 'buy' signal iskoristi. Ako bilo koji makro podatak
 nedostaje, strategija NE kupuje (fail-safe) - radije propušta priliku nego da nagađa.
 Parametri: fast, slow, spx_sma, gold_sma, gold_spike_pct."""
-from app.aux import last_close_on_or_before, sma_on_or_before
+from app.aux_candles import last_close_on_or_before, sma_on_or_before
 from app.strategies.base import Decision, StrategyContext
 
 

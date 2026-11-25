@@ -19,7 +19,7 @@ class StrategyContext:
     index: int  # indeks trenutne (zadnje zatvorene) svijeće u candles
     in_position: bool  # ima li se trenutno otvorena pozicija (kupljeno)
     params: dict
-    aux: dict[str, list[Candle]] = field(default_factory=dict)  # npr. {"SPX": [...]} - vidi app.aux
+    aux: dict[str, list[Candle]] = field(default_factory=dict)  # npr. {"SPX": [...]} - vidi app.aux_candles
     series: dict[str, list[tuple[int, float]]] = field(default_factory=dict)  # npr. {"FEDFUNDS": [...]} - ne-OHLC serije
 
 

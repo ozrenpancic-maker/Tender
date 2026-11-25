@@ -2,11 +2,11 @@
 (iznad vlastitog N-dnevnog prosjeka) - tzv. risk-on filter. Testira ideju da kripto cijene dobrim
 dijelom prate opće raspoloženje na dioničkom tržištu, umjesto da se oslanja samo na kripto cijenu.
 
-Treba 'SPX' u ctx.aux (vidi app.aux i app.equity_client) - ako podatak nije dostupan, strategija se
+Treba 'SPX' u ctx.aux (vidi app.aux_candles i app.equity_client) - ako podatak nije dostupan, strategija se
 NE pretvara da zna makro stanje: jednostavno ne kupuje (fail-safe), što će se vidjeti kao niža
 aktivnost u rezultatima, ne kao tiho zaobilaženje filtra.
 Parametri: fast, slow (kripto SMA), spx_sma (equity SMA period)."""
-from app.aux import last_close_on_or_before, sma_on_or_before
+from app.aux_candles import last_close_on_or_before, sma_on_or_before
 from app.strategies.base import Decision, StrategyContext
 
 

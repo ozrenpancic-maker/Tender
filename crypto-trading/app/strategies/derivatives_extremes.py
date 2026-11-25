@@ -9,7 +9,7 @@ technical_composite) - testira drukčiju tezu, ne nadogradnju iste.
 
 Ako podatak o funding rateu nedostaje za taj dan, strategija ne kupuje (fail-safe).
 Parametri: extreme_negative, extreme_positive, lookback_days, hold_days."""
-from app.aux import series_points_on_or_before
+from app.aux_candles import series_points_on_or_before
 from app.strategies.base import Decision, StrategyContext
 
 FUNDING_SERIES_KEY = "BTC_FUNDING"
