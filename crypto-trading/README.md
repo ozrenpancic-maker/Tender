@@ -646,6 +646,38 @@ out-of-sample/test brojke za VIŠE kombinacija nego što optimizator automatski 
 naknadno "bira" na temelju toga - kod strukturno pomaže (ne vraća sve kombinacije automatski), ali
 disciplina da se out-of-sample stvarno gleda samo jednom je i dalje na korisniku, ne (samo) na kodu.
 
+## Ablacijski test (`app/ml/ablation.py`) - ChatGPT savjet, točka 1, djelomično izvediv odavde
+
+Korisnik je tražio da se izmjeri koliko Wall Street i vijesti stvarno dodaju AI Prediction Engineu
+- dobra hipoteza, vrijedna testiranja umjesto pretpostavljanja. Puna verzija (kripto → +Wall Street
+→ +Wall Street+vijesti) NIJE izvediva iz ovog razvojnog okruženja:
+- **Stooq (Wall Street)** - blokiran (anti-bot filter, uživo potvrđeno i za simbole za koje smo
+  sigurni da su ispravni, vidi "Ograničenja koja treba znati").
+- **CryptoPanic, Reddit, FRED (vijesti/sentiment)** - trebaju BESPLATNE, ali OSOBNE API ključeve
+  koje samo korisnik može registrirati, nisu postavljeni u `.env` ovog okruženja.
+
+**Što JEST testirano** (kao dokazana demonstracija metodologije, ne doslovno traženi izvori):
+DeFiLlama TVL (Total Value Locked) kao proxy dodatni izvor - besplatan, bez ključa, duboka povijest
+(3347 dana za ETH, 2080 za SOL). Dostupan SAMO za ETH/SOL (nema TVL koncepta za BTC/XRP), pa je
+test ograničen na ta dva para - **ISTA populacija primjera u obje varijante** (ne različit broj
+parova po varijanti, što bi usporedbu učinilo nepoštenom).
+
+**Pošten rezultat** (24h horizont, walk-forward, isti purge/embargo kao `app/ml/train.py`):
+- Baseline (samo cijena/tehnički): Brier score 0.53006 (bazna linija bez modela: 0.52361) - **ne
+  prolazi validaciju** (model nije bolji od "ne znam ništa").
+- +TVL (ista populacija primjera, dodan `tvl_roc7`): Brier score 0.53188 - **blago GORE od
+  baselinea**, i dalje ne prolazi validaciju.
+- **Zaključak**: dodavanje TVL-a ovdje NIJE pomoglo - naprotiv, blago je pogoršalo rezultat. Ovo je
+  upravo vrsta nalaza koju ablacijski test treba otkriti (umjesto da se pretpostavi da "više
+  podataka = bolje"), čak i kad je odgovor "ne pomaže".
+- Pokreni `python3 -m app.ml.ablation` za ponovnu provjeru (ispisuje pune walk-forward metrike).
+
+**Za PUNU verziju** (Wall Street + prave vijesti): pokreni isti kod na serveru gdje Stooq radi,
+registriraj besplatne API ključeve (CryptoPanic, Reddit, FRED - svaki par minuta), sinkroniziraj
+podatke preko postojećih dashboard sekcija, pa proširi `app/ml/macro_features.py` po istom obrascu
+(`load_series` već rješava point-in-time ispravnost preko `available_date`) za Wall Street
+povrat/`us_market_open` zastavicu i kombinirani sentiment skor.
+
 ## Stvarna ograničenja veličine naloga + simuliran dnevnik transakcija (ChatGPT savjet, točka 5, prilagođeno simulaciji)
 
 Savjet je uključivao hrvatsku poreznu evidenciju za STVARNU kapitalnu dobit (12%, JOPPD) -
