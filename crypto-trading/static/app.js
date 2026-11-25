@@ -489,20 +489,24 @@ document.getElementById("cbTest").addEventListener("click", async () => {
 
 // ---------- Paper trading ----------
 
+async function downloadCsv(url, filename) {
+  const key = getApiKey();
+  const headers = key ? { Authorization: `Bearer ${key}` } : {};
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(blobUrl);
+}
+
 document.getElementById("ppExportCsv").addEventListener("click", async (e) => {
   e.preventDefault();
   try {
-    const key = getApiKey();
-    const headers = key ? { Authorization: `Bearer ${key}` } : {};
-    const res = await fetch("/api/paper/export-csv", { headers });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "paper_trading_dnevnik_SIMULACIJA.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+    await downloadCsv("/api/paper/export-csv", "paper_trading_dnevnik_SIMULACIJA.csv");
   } catch (err) {
     alert("Greška pri izvozu: " + err.message);
   }
@@ -592,6 +596,15 @@ document.getElementById("atTradeMode").addEventListener("change", (e) => {
   const isSwing = e.target.value === "swing";
   document.getElementById("atSwingFields").style.display = isSwing ? "flex" : "none";
   document.getElementById("atSwingNote").style.display = isSwing ? "block" : "none";
+});
+
+document.getElementById("atExportCsv").addEventListener("click", async (e) => {
+  e.preventDefault();
+  try {
+    await downloadCsv("/api/auto-trader/export-csv", "auto_trader_SVI_RUNOVI_SIMULACIJA.csv");
+  } catch (err) {
+    alert("Greška pri izvozu: " + err.message);
+  }
 });
 
 document.getElementById("atStart").addEventListener("click", async () => {
@@ -688,6 +701,15 @@ async function showAutoTraderDetail(runId) {
 function fmtUsd(n) {
   return `$${Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 }
+
+document.getElementById("wmExportCsv").addEventListener("click", async (e) => {
+  e.preventDefault();
+  try {
+    await downloadCsv("/api/whale-mirror/export-csv", "whale_mirror_SVI_RUNOVI_SIMULACIJA.csv");
+  } catch (err) {
+    alert("Greška pri izvozu: " + err.message);
+  }
+});
 
 document.getElementById("wmStart").addEventListener("click", async () => {
   const label = document.getElementById("wmLabel").value.trim() || "(bez oznake)";

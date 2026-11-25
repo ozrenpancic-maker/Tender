@@ -275,6 +275,43 @@ def stop_run(run_id: int) -> None:
         conn.close()
 
 
+def export_trades_csv(run_id: int | None = None) -> str:
+    """CSV izvoz svih trgovina (svi runovi, ili samo jedan) - za vanjsku analizu nakon što se
+    nakupi dovoljno podataka (tjedni/mjeseci). Izravan dump auto_trader_trade retka, bez replaya -
+    tablica već ima sve potrebne stupce po trgovini."""
+    import csv
+    import io
+
+    conn = db.get_connection()
+    try:
+        if run_id is not None:
+            rows = conn.execute(
+                "SELECT * FROM auto_trader_trade WHERE run_id=? ORDER BY executed_at", (run_id,)
+            ).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM auto_trader_trade ORDER BY run_id, executed_at").fetchall()
+
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["run_id", "datum_vrijeme_utc", "par", "strana", "cijena", "iznos_eur", "ai_score", "odluka"])
+        for r in rows:
+            writer.writerow(
+                [
+                    r["run_id"],
+                    time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(r["executed_at"])),
+                    r["pair"],
+                    r["side"],
+                    r["price"],
+                    r["amount_eur"],
+                    r["ai_score"],
+                    r["decision"],
+                ]
+            )
+        return buf.getvalue()
+    finally:
+        conn.close()
+
+
 def resume_running_on_startup() -> None:
     conn = db.get_connection()
     try:

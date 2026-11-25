@@ -168,6 +168,41 @@ def stop_run(run_id: int) -> None:
         conn.close()
 
 
+def export_trades_csv(run_id: int | None = None) -> str:
+    """CSV izvoz svih trgovina (svi runovi, ili samo jedan) - za vanjsku analizu nakon što se
+    nakupi dovoljno podataka (tjedni/mjeseci). Izravan dump whale_mirror_trade retka."""
+    import csv
+    import io
+
+    conn = db.get_connection()
+    try:
+        if run_id is not None:
+            rows = conn.execute(
+                "SELECT * FROM whale_mirror_trade WHERE run_id=? ORDER BY executed_at", (run_id,)
+            ).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM whale_mirror_trade ORDER BY run_id, executed_at").fetchall()
+
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["run_id", "datum_vrijeme_utc", "strana", "cijena", "iznos_usd", "whale_stanje_eth", "whale_promjena_pct"])
+        for r in rows:
+            writer.writerow(
+                [
+                    r["run_id"],
+                    time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(r["executed_at"])),
+                    r["side"],
+                    r["price"],
+                    r["amount_usd"],
+                    r["whale_balance_eth"],
+                    r["whale_delta_pct"],
+                ]
+            )
+        return buf.getvalue()
+    finally:
+        conn.close()
+
+
 def resume_running_on_startup() -> None:
     conn = db.get_connection()
     try:

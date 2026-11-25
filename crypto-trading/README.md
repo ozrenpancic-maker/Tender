@@ -967,6 +967,31 @@ referencu. Koristi se isključivo javni, read-only Coinbase cjenovni feed (bez k
 trading (ručni, odjeljak 9, i automatizirani, odjeljak 10) i backtest. "Automatizirano" u
 odjeljku 10 znači autonomna ODLUKA unutar simulacije, ne pravi nalog - vidi poglavlje iznad.
 
+## Kako analizirati rezultate dugoročne uživo simulacije
+
+Korisnik je pokrenuo paralelno niz paper trading / auto-trader / whale-mirror runova (25.11.2026.)
+da se vidi što stvarno radi kroz tjedne/mjesece. Plan analize, da se izbjegne isti problem kao kod
+backtesta (samoobmana, biranje "pobjednika" prerano):
+
+1. **Pusti da prođe dovoljno vremena prije bilo kakvog zaključka.** Dnevne strategije trebaju
+   barem par tjedana da nakupe desetak+ trgovina (manje od toga = šum, ne signal - vidi "365-dnevni
+   test rangiranja" iznad gdje je upravo ovo bio problem s `ema_trend`). 1h/4h auto-trader i whale
+   mirror mogu pokazati nešto ranije jer donose odluke češće, ali i dalje treba barem nekoliko
+   tjedana za bilo kakav pouzdan zaključak.
+2. **Izvoz podataka**: svaki od tri sustava (paper trading, auto-trader, whale mirror) sad ima CSV
+   izvoz svih trgovina (gumb "Izvezi SVE trgovine u CSV" u odgovarajućem odjeljku dashboarda, ili
+   `/api/{paper,auto-trader,whale-mirror}/export-csv`). Pošto ja (Claude) nemam daljinski pristup
+   korisnikovom serveru, analiza se radi tako da korisnik izveze CSV-ove i podijeli ih (ili
+   screenshot sažetka s dashboarda) kad dođe vrijeme za pregled.
+3. **Mjerila, ista disciplina kao kod backtesta**: konačni saldo NASUPROT buy&hold za isto
+   razdoblje (ne apsolutni broj), broj trgovina (premalo = ne vjeruj rezultatu bez obzira je li
+   dobar ili loš), max pad, i POŠTENO gledanje svih runova - uključujući one koji gube, ne samo
+   "pobjednike". Isto pravilo kao uvijek: curve-fitting/biranje najboljeg nakon činjenice se ne
+   računa kao dokaz.
+4. **Nakon dovoljno podataka**: usporedi sve runove jedni s drugima (isti format kao "Koja
+   strategija je stvarno najbolja" test), zadrži ono što pokaže dosljednu prednost, ugasi ostalo -
+   ne nastavljaj raditi sve paralelno unedogled.
+
 ## Ograničenja koja treba znati
 
 - Strategije su long-only na spotu (kupi/drži/prodaj) - nema shortanja ni poluge.

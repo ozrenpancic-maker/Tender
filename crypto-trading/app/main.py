@@ -468,6 +468,14 @@ def auto_trader_runs():
         conn.close()
 
 
+@app.get("/api/auto-trader/export-csv")
+def auto_trader_export_csv_all():
+    from app import auto_trader
+
+    csv_text = auto_trader.export_trades_csv()
+    return PlainTextResponse(csv_text, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=auto_trader_SVI_RUNOVI_SIMULACIJA.csv"})
+
+
 @app.get("/api/auto-trader/{run_id}")
 def auto_trader_detail(run_id: int):
     conn = db.get_connection()
@@ -486,6 +494,14 @@ def auto_trader_detail(run_id: int):
         }
     finally:
         conn.close()
+
+
+@app.get("/api/auto-trader/{run_id}/export-csv")
+def auto_trader_export_csv_one(run_id: int):
+    from app import auto_trader
+
+    csv_text = auto_trader.export_trades_csv(run_id)
+    return PlainTextResponse(csv_text, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=auto_trader_run_{run_id}_SIMULACIJA.csv"})
 
 
 # ---------- Whale mirror (zrcali javni on-chain novčanik, UŽIVO, bez backtesta) ----------
@@ -544,6 +560,14 @@ def whale_mirror_test_connection():
         raise HTTPException(400, str(err))
 
 
+@app.get("/api/whale-mirror/export-csv")
+def whale_mirror_export_csv_all():
+    from app import whale_mirror
+
+    csv_text = whale_mirror.export_trades_csv()
+    return PlainTextResponse(csv_text, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=whale_mirror_SVI_RUNOVI_SIMULACIJA.csv"})
+
+
 @app.get("/api/whale-mirror/{run_id}")
 def whale_mirror_detail(run_id: int):
     conn = db.get_connection()
@@ -556,6 +580,14 @@ def whale_mirror_detail(run_id: int):
         return {"run": dict(run), "trades": [dict(t) for t in trades], "equity_curve": [dict(e) for e in equity]}
     finally:
         conn.close()
+
+
+@app.get("/api/whale-mirror/{run_id}/export-csv")
+def whale_mirror_export_csv_one(run_id: int):
+    from app import whale_mirror
+
+    csv_text = whale_mirror.export_trades_csv(run_id)
+    return PlainTextResponse(csv_text, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=whale_mirror_run_{run_id}_SIMULACIJA.csv"})
 
 
 def _run_summary(conn, run: dict) -> dict:
