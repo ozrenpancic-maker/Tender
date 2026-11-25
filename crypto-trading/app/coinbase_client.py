@@ -156,6 +156,35 @@ def get_public_daily_candles(product_id: str, days: int = 120):
     return get_public_candles(product_id, 86400, days * 86400)
 
 
+def get_product_constraints(product_id: str) -> dict:
+    """Stvarna ograničenja veličine naloga za ovaj par (ChatGPT savjet, točka 5) - minimalan iznos
+    naloga (`min_market_funds`, u kotirajućoj valuti) i najmanji korak količine baznog asseta
+    (`base_increment`, npr. 1 za PEPE - ne može se kupiti 0,5 PEPE). Realna simulacija ne smije
+    tiho pretpostaviti da se može kupiti/prodati bilo koja razlomljena količina - pravi nalog te
+    veličine bi Coinbase odbio."""
+    with httpx.Client(timeout=10) as client:
+        resp = client.get(f"{PUBLIC_BASE}/products/{product_id}")
+    if resp.status_code != 200:
+        raise CoinbaseError(f"HTTP {resp.status_code} od {PUBLIC_BASE}: {resp.text[:300]}")
+    data = resp.json()
+    try:
+        return {
+            "min_market_funds": float(data["min_market_funds"]),
+            "base_increment": float(data["base_increment"]),
+        }
+    except (KeyError, TypeError, ValueError) as err:
+        raise CoinbaseError(f"Odgovor nema očekivana polja min_market_funds/base_increment: {data}") from err
+
+
+def floor_to_increment(quantity: float, increment: float) -> float:
+    """Zaokruži NADOLJE na najbliži dopušteni korak - simulira da Coinbase odbija količine koje
+    nisu točan višekratnik base_increment (npr. PEPE se mora kupovati u cijelim komadima)."""
+    if increment <= 0:
+        return quantity
+    steps = int(quantity / increment)
+    return steps * increment
+
+
 def test_connection() -> dict:
     """Vraća dijagnostiku - ista konvencija kao /api/tender-search/test-connection u Tender aplikaciji."""
     result = {"public_feed": {"ok": False, "message": ""}}

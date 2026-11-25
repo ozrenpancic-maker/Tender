@@ -461,6 +461,25 @@ document.getElementById("cbTest").addEventListener("click", async () => {
 
 // ---------- Paper trading ----------
 
+document.getElementById("ppExportCsv").addEventListener("click", async (e) => {
+  e.preventDefault();
+  try {
+    const key = getApiKey();
+    const headers = key ? { Authorization: `Bearer ${key}` } : {};
+    const res = await fetch("/api/paper/export-csv", { headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "paper_trading_dnevnik_SIMULACIJA.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert("Greška pri izvozu: " + err.message);
+  }
+});
+
 document.getElementById("ppStart").addEventListener("click", async () => {
   const strategy = document.getElementById("ppStrategy").value;
   const pair = document.getElementById("ppPair").value;

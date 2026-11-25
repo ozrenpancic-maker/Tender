@@ -3,7 +3,7 @@ import json
 import time
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -370,6 +370,16 @@ def paper_runs():
         conn.close()
 
 
+@app.get("/api/paper/export-csv")
+def paper_export_csv_all():
+    """SIMULIRAN dnevnik transakcija (vježba FIFO knjigovodstva) preko SVIH paper trading runova -
+    NIJE prava porezna evidencija, nema stvarne kapitalne dobiti jer nema pravog novca. Registrirano
+    PRIJE /api/paper/{run_id} - FastAPI bira rutu po redoslijedu registracije, a /api/paper/{run_id}
+    bi inače "export-csv" pokušao parsirati kao run_id."""
+    csv_text = paper_engine.export_trades_csv()
+    return PlainTextResponse(csv_text, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=paper_trading_dnevnik_SIMULACIJA.csv"})
+
+
 @app.get("/api/paper/{run_id}")
 def paper_detail(run_id: int):
     conn = db.get_connection()
@@ -384,6 +394,12 @@ def paper_detail(run_id: int):
         return {"run": dict(run), "trades": [dict(t) for t in trades], "equity_curve": [dict(e) for e in equity]}
     finally:
         conn.close()
+
+
+@app.get("/api/paper/{run_id}/export-csv")
+def paper_export_csv_one(run_id: int):
+    csv_text = paper_engine.export_trades_csv(run_id)
+    return PlainTextResponse(csv_text, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=paper_run_{run_id}_SIMULACIJA.csv"})
 
 
 # ---------- Automatizirani multi-coin paper trading (AI bira coin) ----------

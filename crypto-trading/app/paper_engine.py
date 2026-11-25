@@ -213,7 +213,15 @@ def _tick(run_id: int) -> None:
         execution_mode = run["execution_mode"]
 
         if decision == "buy" and not in_position:
-            if execution_mode == "maker_post_only":
+            try:
+                constraints = coinbase_client.get_product_constraints(product_id)
+            except Exception as err:
+                print(f"[paper_engine] run {run_id}: ne mogu dohvatiti ograničenja veličine naloga za {pair} ({err}) - preskačem provjeru ovaj tick.")
+                constraints = None
+
+            if constraints and cash < constraints["min_market_funds"]:
+                print(f"[paper_engine] run {run_id}: {cash:.2f} je ispod minimalnog iznosa naloga ({constraints['min_market_funds']}) za {pair} - preskačem kupnju.")
+            elif execution_mode == "maker_post_only":
                 # Posti nalog NA trenutnom bidu (ne prelazi spread) - ispunjenje nije zajamčeno,
                 # vidi _handle_pending_order. Nema paper_trade retka dok se stvarno ne ispuni.
                 conn.execute(
@@ -223,6 +231,11 @@ def _tick(run_id: int) -> None:
             else:
                 fill = taker_buy_fill(ask)
                 new_position = (cash * (1 - TAKER_FEE)) / fill
+                if constraints:
+                    # Stvarna veličina naloga mora biti točan višekratnik base_increment (npr. cijeli
+                    # broj za PEPE) - zaokruži nadolje kao što bi stvarna burza napravila. Ostatak je
+                    # zanemariv za sve testirane parove (najgore ~1 jedinica PEPE ≈ manje od 0,001 centa).
+                    new_position = coinbase_client.floor_to_increment(new_position, constraints["base_increment"])
                 conn.execute(
                     "INSERT INTO paper_trade (run_id, side, price, balance_after_eur, position_after_base, executed_at, note)"
                     " VALUES (?, 'buy', ?, 0, ?, ?, ?)",
@@ -310,6 +323,55 @@ def stop_run(run_id: int) -> None:
     try:
         conn.execute("UPDATE paper_run SET status='stopped', stopped_at=? WHERE id=?", (int(time.time()), run_id))
         conn.commit()
+    finally:
+        conn.close()
+
+
+def export_trades_csv(run_id: int | None = None) -> str:
+    """Simulirani dnevnik transakcija za vježbu FIFO knjigovodstva (ChatGPT savjet, točka 5,
+    prilagođeno simulaciji po korisnikovom izboru) - NIJE prava porezna evidencija, nema stvarne
+    kapitalne dobiti jer nema pravog novca. Rekonstruira količinu i naknadu po trgovini replay-om
+    (isti pristup kao _replay_state), bez potrebe za dodatnim stupcima u bazi."""
+    import csv
+    import io
+
+    conn = db.get_connection()
+    try:
+        if run_id is not None:
+            runs = conn.execute("SELECT * FROM paper_run WHERE id=? AND mode='paper'", (run_id,)).fetchall()
+        else:
+            runs = conn.execute("SELECT * FROM paper_run WHERE mode='paper' ORDER BY id").fetchall()
+
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow([
+            "run_id", "par", "datum_vrijeme_utc", "strana", "kolicina_baza", "cijena",
+            "naknada_eur", "iznos_eur", "izvrsenje", "napomena",
+        ])
+        for run in runs:
+            fee_rate = MAKER_FEE if run["execution_mode"] == "maker_post_only" else TAKER_FEE
+            cash, position = run["starting_balance_eur"], 0.0
+            trades = conn.execute(
+                "SELECT * FROM paper_trade WHERE run_id=? ORDER BY id", (run["id"],)
+            ).fetchall()
+            for t in trades:
+                when = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(t["executed_at"]))
+                if t["side"] == "buy":
+                    quantity = t["position_after_base"]
+                    amount_eur = cash
+                    fee_eur = cash * fee_rate
+                    cash, position = 0.0, quantity
+                else:
+                    quantity = position
+                    gross = quantity * t["price"]
+                    amount_eur = t["balance_after_eur"]
+                    fee_eur = gross - amount_eur
+                    cash, position = amount_eur, 0.0
+                writer.writerow([
+                    run["id"], run["pair"], when, t["side"], round(quantity, 10), t["price"],
+                    round(fee_eur, 6), round(amount_eur, 4), run["execution_mode"], t["note"] or "",
+                ])
+        return buf.getvalue()
     finally:
         conn.close()
 

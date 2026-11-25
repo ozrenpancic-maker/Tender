@@ -646,6 +646,29 @@ out-of-sample/test brojke za VIŠE kombinacija nego što optimizator automatski 
 naknadno "bira" na temelju toga - kod strukturno pomaže (ne vraća sve kombinacije automatski), ali
 disciplina da se out-of-sample stvarno gleda samo jednom je i dalje na korisniku, ne (samo) na kodu.
 
+## Stvarna ograničenja veličine naloga + simuliran dnevnik transakcija (ChatGPT savjet, točka 5, prilagođeno simulaciji)
+
+Savjet je uključivao hrvatsku poreznu evidenciju za STVARNU kapitalnu dobit (12%, JOPPD) -
+korisnik je odabrao prilagodbu simulaciji. Ono što je ugrađeno:
+
+- **Stvarna ograničenja veličine naloga**: `get_product_constraints()` dohvaća Coinbaseov
+  `min_market_funds` (minimalan iznos naloga u kotirajućoj valuti, npr. 1 USD) i `base_increment`
+  (najmanji korak količine - npr. PEPE se mora kupovati u cijelim komadima, ne razlomljeno). Paper
+  trading sad **odbija kupnju** ako je raspoloživa gotovina ispod minimuma (umjesto da tiho
+  simulira nalog koji bi pravi Coinbase odbio), i zaokružuje kupljenu količinu NADOLJE na dopušteni
+  korak - uživo potvrđeno (XRP min ~1€, PEPE base_increment=1 → kupljena količina je uvijek cijeli
+  broj).
+- **Simuliran dnevnik transakcija** - novi "Izvezi SVE trgovine u CSV" gumb (odjeljak 9): izvozi
+  svaku trgovinu (preko svih paper trading runova) s rekonstruiranom količinom i naknadom po
+  retku, za vježbu FIFO knjigovodstva. **Eksplicitno NIJE prava porezna evidencija** - nema stvarne
+  kapitalne dobiti jer nema pravog novca; oznaka "SIMULACIJA" je u nazivu preuzete datoteke da se
+  ne pomiješa sa stvarnim izvještajem.
+- **Što NIJE napravljeno (namjerna granica opsega)**: "očekivani pomak, procijenjeni trošak i
+  razlog za svaku odluku" bi zahtijevao da SVIH ~15 pravilima-vođenih strategija vraća strukturirano
+  obrazloženje uz buy/sell/hold, ne samo odluku - prevelika izmjena za ovaj krug. AI Prediction
+  Engine (odjeljak 1) to već radi (P(up)/P(down)/P(sideways), `reasons_for`/`reasons_against`) za
+  ML dio sustava; isto za rule-based strategije ostaje otvoreno za budući rad.
+
 ## Pauza bota vs zatvaranje pozicije (ChatGPT savjet, točka 4, prilagođeno simulaciji)
 
 Savjet je pretpostavljao PRAVO trgovanje (client_order_id idempotencija za prave naloge,
