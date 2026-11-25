@@ -31,3 +31,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE macro_series ADD COLUMN available_date TEXT NOT NULL DEFAULT ''")
     except sqlite3.OperationalError:
         pass  # stupac već postoji
+    try:
+        # Default 1440 (dnevno) - postojeći runovi su svi bili dnevni prije ovog dodatka.
+        conn.execute("ALTER TABLE paper_run ADD COLUMN interval_min INTEGER NOT NULL DEFAULT 1440")
+    except sqlite3.OperationalError:
+        pass  # stupac već postoji

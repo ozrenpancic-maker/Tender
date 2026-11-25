@@ -10,6 +10,7 @@ from app.strategies import (
     multi_macro_filter,
     rsi_meanrev,
     sma_crossover,
+    stair_step_swing,
     technical_composite,
     trend_guard,
     vol_guarded_trend,
@@ -60,4 +61,5 @@ GENERIC_STRATEGIES = {
     "donchian_breakout": {"label": donchian_breakout.LABEL, "default_params": donchian_breakout.DEFAULT_PARAMS, "decide": donchian_breakout.decide, "needs_aux": [], "needs_series": []},
     "dual_momentum": {"label": dual_momentum.LABEL, "default_params": dual_momentum.DEFAULT_PARAMS, "decide": dual_momentum.decide, "needs_aux": [], "needs_series": []},
     "vol_guarded_trend": {"label": vol_guarded_trend.LABEL, "default_params": vol_guarded_trend.DEFAULT_PARAMS, "decide": vol_guarded_trend.decide, "needs_aux": [], "needs_series": []},
+    "stair_step_swing": {"label": stair_step_swing.LABEL, "default_params": stair_step_swing.DEFAULT_PARAMS, "decide": stair_step_swing.decide, "needs_aux": [], "needs_series": []},
 }

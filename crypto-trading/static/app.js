@@ -430,11 +430,12 @@ document.getElementById("ppStart").addEventListener("click", async () => {
   const strategy = document.getElementById("ppStrategy").value;
   const pair = document.getElementById("ppPair").value;
   const starting_balance = Number(document.getElementById("ppBalance").value);
+  const interval_min = Number(document.getElementById("ppInterval").value);
   try {
     await api("/api/paper/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ strategy, pair, starting_balance }),
+      body: JSON.stringify({ strategy, pair, starting_balance, interval_min }),
     });
     refreshPaperRuns();
   } catch (err) {
@@ -449,8 +450,9 @@ async function refreshPaperRuns() {
   tbody.innerHTML = "";
   for (const run of runs) {
     const label = (STRATEGIES.find((s) => s.key === run.strategy) || {}).label || run.strategy;
+    const intervalLabel = run.interval_min === 60 ? "satno" : "dnevno";
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${run.id}</td><td>${label}</td><td>${run.pair}</td><td>${run.status}</td>
+    tr.innerHTML = `<td>${run.id}</td><td>${label}</td><td>${run.pair}</td><td>${intervalLabel}</td><td>${run.status}</td>
       <td>${fmtEur(run.current_equity_eur)}</td><td></td>`;
     const actionCell = tr.querySelector("td:last-child");
     const viewBtn = document.createElement("button");

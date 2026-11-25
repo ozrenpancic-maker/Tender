@@ -288,6 +288,13 @@
         <select id="ppPair"></select>
       </div>
       <div class="field">
+        <label>Interval svijeća</label>
+        <select id="ppInterval">
+          <option value="1440">Dnevno (1 trgovina na dan, najviše)</option>
+          <option value="60">Satno (više trgovina dnevno - za "stepenice" strategiju)</option>
+        </select>
+      </div>
+      <div class="field">
         <label>Virtualna sredstva (EUR)</label>
         <input type="number" id="ppBalance" value="500" />
       </div>
@@ -295,7 +302,7 @@
     </div>
     <table id="ppTable" style="display:none">
       <thead>
-        <tr><th>#</th><th>Strategija</th><th>Par</th><th>Status</th><th>Trenutni saldo</th><th>Akcija</th></tr>
+        <tr><th>#</th><th>Strategija</th><th>Par</th><th>Interval</th><th>Status</th><th>Trenutni saldo</th><th>Akcija</th></tr>
       </thead>
       <tbody></tbody>
     </table>

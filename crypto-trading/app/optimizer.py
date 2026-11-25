@@ -43,6 +43,10 @@ DEFAULT_GRIDS: dict[str, dict[str, list]] = {
         "lookback_days": [1, 3, 5],
         "hold_days": [3, 5, 7, 10],
     },
+    # "stair_step_swing" namjerno NIJE ovdje: dizajniran je za satne svijeće, a optimize()/dashboard
+    # Optimizator trenutno radi samo na dnevnim (interval_min=1440 je hardkodiran u run_backtest
+    # poziv ispod) - dodavanje mreže ovdje bi tiho davalo pogrešne (besmislene) rezultate. Ručna
+    # in-sample/out-of-sample provjera za ovu strategiju je u README-u ("Stepenice - pošten nalaz").
 }
 
 MAX_COMBINATIONS = 400

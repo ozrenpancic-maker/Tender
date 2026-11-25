@@ -10,7 +10,8 @@ from app.macro_clients import MACRO_CLIENTS
 from app.strategies import GENERIC_STRATEGIES
 from app.strategies.base import StrategyContext
 
-POLL_INTERVAL_SECONDS = 300  # provjera svakih 5 minuta; odluka se donosi samo kad se pojavi nova zatvorena dnevna svijeća
+POLL_INTERVAL_SECONDS = 300  # provjera svakih 5 minuta; odluka se donosi samo kad se pojavi nova zatvorena svijeća
+CANDLE_LOOKBACK_COUNT = 400  # margina za indikatore s dugim lookbackom (npr. SMA200, trend_period=100)
 
 _active_runs: dict[int, threading.Event] = {}
 _lock = threading.Lock()
@@ -41,6 +42,8 @@ def _tick(run_id: int) -> None:
         pair = run["pair"]
         strategy_key = run["strategy"]
         params = json.loads(run["params_json"])
+        interval_min = run["interval_min"]
+        granularity = interval_min * 60
         product_id = coinbase_client.to_product_id(pair)
 
         try:
@@ -64,7 +67,9 @@ def _tick(run_id: int) -> None:
         conn.commit()
 
         try:
-            candles = coinbase_client.get_public_daily_candles(product_id, days=120)
+            candles = coinbase_client.get_public_candles_paginated(
+                product_id, granularity=granularity, lookback_seconds=granularity * CANDLE_LOOKBACK_COUNT
+            )
         except Exception as err:
             print(f"[paper_engine] run {run_id}: ne mogu dohvatiti svijeće ({err})")
             return
@@ -74,7 +79,7 @@ def _tick(run_id: int) -> None:
 
         latest = candles[-1]
         if run["last_evaluated_candle_at"] == latest.opened_at:
-            return  # ova dnevna svijeća je već obrađena
+            return  # ova svijeća (na ovom intervalu) je već obrađena
 
         strategy = GENERIC_STRATEGIES[strategy_key]
         aux = {}
@@ -129,17 +134,22 @@ def _loop(run_id: int, stop_event: threading.Event) -> None:
         stop_event.wait(POLL_INTERVAL_SECONDS)
 
 
-def start_run(strategy_key: str, params: dict, pair: str, starting_balance: float) -> int:
+VALID_INTERVALS_MIN = {60, 1440}  # 1h ili 1d (Coinbase javni feed ne nudi 4h izravno)
+
+
+def start_run(strategy_key: str, params: dict, pair: str, starting_balance: float, interval_min: int = 1440) -> int:
     if strategy_key not in GENERIC_STRATEGIES:
         raise ValueError(f"Strategija '{strategy_key}' nije podržana za paper trading.")
+    if interval_min not in VALID_INTERVALS_MIN:
+        raise ValueError(f"Nepodržan interval {interval_min} min. Dostupno: {sorted(VALID_INTERVALS_MIN)}")
 
     conn = db.get_connection()
     try:
         full_params = {**GENERIC_STRATEGIES[strategy_key]["default_params"], **params}
         cur = conn.execute(
-            "INSERT INTO paper_run (strategy, params_json, pair, started_at, starting_balance_eur, status, mode)"
-            " VALUES (?, ?, ?, ?, ?, 'running', 'paper')",
-            (strategy_key, json.dumps(full_params), pair, int(time.time()), starting_balance),
+            "INSERT INTO paper_run (strategy, params_json, pair, started_at, starting_balance_eur, status, mode, interval_min)"
+            " VALUES (?, ?, ?, ?, ?, 'running', 'paper', ?)",
+            (strategy_key, json.dumps(full_params), pair, int(time.time()), starting_balance, interval_min),
         )
         conn.commit()
         run_id = cur.lastrowid

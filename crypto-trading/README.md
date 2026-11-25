@@ -637,6 +637,38 @@ novca), pravog automatiziranog tradinga uz jasno upozorenje o riziku, ili samo r
   da se prvo ponovno napiše `live_engine.py` (uklonjen, vidi pravilo ispod) i autenticirani
   Coinbase klijent.
 
+## Stepenice (`app/strategies/stair_step_swing.py`) - pošten nalaz
+
+Korisnik je tražio bota koji "lovi stepenice": u uzlaznom trendu cijena malo raste pa malo padne pa
+opet raste - ideja je kupiti ta mala povlačenja prije odskoka i prodati na lokalnom vrhu, više puta
+dnevno, i dalje isključivo u simulaciji (bez pravog novca). Da bi se to uopće moglo testirati, Paper
+trading (odjeljak 9) je proširen da radi i na **satnim svijećama** (ne samo dnevnim kao prije) -
+izbor intervala je sad dio obrasca za pokretanje runa.
+
+Strategija: u širem trendu (zatvaranje iznad duge SMA) kupuje kad cijena dotakne/padne ispod donje
+Bollingerove vrpce (lokalno povlačenje), a prodaje na: dosegnut profit cilj, dodir gornje vrpce
+(lokalni vrh), stop-loss, ili slom šireg trenda.
+
+**Pošten rezultat testiranja (grid pretraga 72 kombinacije parametara, BTC/USDT satne svijeće,
+in-sample 2023-11 do 2025-11, out-of-sample 2025-11 do 2026-11-22):**
+- Parametri dovoljno osjetljivi da bi stvarno trgovali "više puta dnevno" (uski Bollingerove vrpce,
+  `bb_std=1.5`) **gube katastrofalno** - do 94% početnog iznosa. Razlog: uzorak koji djeluje
+  bezazleno na oku (mali zig-zag) statistički ne razlikuje pravo povlačenje od početka pravog pada -
+  uski filter hvata obje situacije podjednako, a gubici na pravim padovima nadjačaju dobitke na
+  pravim povlačenjima.
+- Najbolja pronađena kombinacija (širi filter, `bb_std=2.5`, vidi `DEFAULT_PARAMS` u kodu) gubi
+  **blago na OBA razdoblja** (~8-12% od 1000€ polazišta), uz samo 5-16 trgovina u ~2 godine - rijetko,
+  ne "više puta dnevno" kako je bila zamisao. Naknade (0,4%) + slippage (0,1%) po strani (~1%
+  round-trip) jedu većinu male prednosti koju bi ovaj pristup inače mogao imati.
+- **Zaključak**: ovaj točan pristup (Bollingerove vrpce + SMA trend filter na satnim BTC/USDT
+  podacima) **nema dokazanu prednost** nakon troškova. Uključen je u aplikaciju kao alat za dalje
+  istraživanje (probaj druge parove, kraće/duže periode, druge indikatore poput RSI/Stochastic RSI
+  umjesto Bollingerovih vrpci) - ne kao gotova preporuka za korištenje.
+- Dashboard "Optimizator" (odjeljak 7) namjerno NE nudi ovu strategiju u padajućem izborniku zadanih
+  mreža parametara - radi samo na dnevnim svijećama, a ova strategija je dizajnirana za satne, pa bi
+  tiho davao besmislene rezultate. Daljnje testiranje treba raditi ručno (`app/optimizer.optimize`
+  pozvan izravno s `interval_min=60`) dok se Optimizator ne proširi na proizvoljan interval.
+
 ## Isključivo savjetnik/simulator (KriptoMVP 4.4 nepromjenjiva pravila)
 
 Aplikacija **nikada ne izvršava prave naloge** i ne traži Coinbase trgovačke (autenticirane) API
@@ -650,10 +682,12 @@ odjeljku 10 znači autonomna ODLUKA unutar simulacije, ne pravi nalog - vidi pog
 ## Ograničenja koja treba znati
 
 - Strategije su long-only na spotu (kupi/drži/prodaj) - nema shortanja ni poluge.
-- Paper trading donosi odluke na dnevnim svijećama dohvaćenim uživo s Coinbasea, ne iz statične
-  `data/kripto.sqlite` baze (ta baza se koristi samo za backtest).
-- `dip_buy_volume` i `rsi_meanrev` su u jedinom dosad pokrenutom testu izgubili novac - uključene
-  su kao alat za daljnje istraživanje, ne kao preporuka.
+- Paper trading donosi odluke na svijećama dohvaćenim uživo s Coinbasea (dnevne ili satne, ovisno o
+  izboru pri pokretanju runa), ne iz statične `data/kripto.sqlite` baze (ta baza se koristi samo za
+  backtest).
+- `dip_buy_volume`, `rsi_meanrev` i `stair_step_swing` su u dosad pokrenutim testovima izgubile
+  novac - uključene su kao alat za daljnje istraživanje, ne kao preporuka (vidi "Stepenice - pošten
+  nalaz" iznad za potpun rezultat potonje).
 - "Wall Street"/zlato podaci pokrivaju tri indeksa i zlato preko Stooq-a, dnevna rezolucija. Stooq
   simboli (`^spx`, `^dji`, `^ndq`, `xauusd`) nisu uživo potvrđeni - ako "Testiraj vezu" javi grešku
   za neki od njih, ispravi simbol u `app/equity_client.py` (`INDEX_SYMBOLS`).
