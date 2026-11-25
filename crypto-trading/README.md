@@ -684,6 +684,31 @@ in-sample 2023-11 do 2025-11, out-of-sample 2025-11 do 2026-11-22):**
   tiho davao besmislene rezultate. Daljnje testiranje treba raditi ručno (`app/optimizer.optimize`
   pozvan izravno s `interval_min=60`) dok se Optimizator ne proširi na proizvoljan interval.
 
+## Stepenice v2 (`app/strategies/stair_step_stochrsi.py`) - pošten nalaz (GORI od v1)
+
+Drugi, drugačiji mehanizam za isti cilj, na korisnikov zahtjev nakon v1: umjesto dodira Bollingerove
+vrpce, Stochastic RSI **presjek** preko granice prenisprodanosti/prekupljenosti (hvata trenutak
+zaokreta, ne cijelo razdoblje niske vrijednosti) + SMA trend filter + stop-loss.
+
+**Pošten rezultat testiranja:**
+- Prvi test (4 odvojena povijesna razdoblja × 4 para, zadani parametri): **gubi 65-90% u SVAKOJ**
+  od 16 kombinacija razdoblje/par, bez iznimke. 130-180 trgovina po razdoblju (svaka 2-5 dana) -
+  puno češće nego v1, i puno gore.
+- Grid pretraga 81 kombinacije (BTC/USDT satno, in-sample 2023-11 do 2025-05, out-of-sample
+  2025-05 do 2026-11): **najbolja pronađena kombinacija gubi ~94% in-sample i ~90% out-of-sample.**
+  Nijedna od 81 testiranih kombinacija nije bila ni blizu profitabilnosti.
+- **Zaključak: ovaj pristup je GORI od v1 (Bollingerove vrpce), ne bolji.** Presjek preko granice
+  okida se prečesto (puno kraći "signal" traje nego dodir vrpce), a svaka dodatna trgovina znači
+  još ~1% round-trip troška - uz 130-290 trgovina po razdoblju to brzo pojede sav kapital. Ostavljen
+  je u kodu kao dokumentiran negativan nalaz (uči se i iz onoga što NE radi), ne kao preporuka -
+  **ne koristi ovu strategiju.**
+- **Širi zaključak nakon dva neovisna pokušaja**: problem nije (samo) izbor indikatora nego
+  temeljni kompromis - svaki mehanizam dovoljno osjetljiv da stvarno hvata "stepenice" više puta
+  dnevno/tjedno nužno hvata i prave preokrete, a trošak svake dodatne trgovine (~1% round-trip)
+  brzo nadjača male dobitke na pravim povlačenjima. Čista tehnička analiza na satnim
+  kripto-podacima (barem BTC/ETH/SOL/XRP, ova dva mehanizma) **ne pokazuje dokazanu prednost**
+  nakon realnih troškova.
+
 ## Isključivo savjetnik/simulator (KriptoMVP 4.4 nepromjenjiva pravila)
 
 Aplikacija **nikada ne izvršava prave naloge** i ne traži Coinbase trgovačke (autenticirane) API
@@ -700,9 +725,10 @@ odjeljku 10 znači autonomna ODLUKA unutar simulacije, ne pravi nalog - vidi pog
 - Paper trading donosi odluke na svijećama dohvaćenim uživo s Coinbasea (dnevne ili satne, ovisno o
   izboru pri pokretanju runa), ne iz statične `data/kripto.sqlite` baze (ta baza se koristi samo za
   backtest).
-- `dip_buy_volume`, `rsi_meanrev` i `stair_step_swing` su u dosad pokrenutim testovima izgubile
-  novac - uključene su kao alat za daljnje istraživanje, ne kao preporuka (vidi "Stepenice - pošten
-  nalaz" iznad za potpun rezultat potonje).
+- `dip_buy_volume`, `rsi_meanrev`, `stair_step_swing` i `stair_step_stochrsi` su u dosad pokrenutim
+  testovima izgubile novac (potonja dva katastrofalno, 65-94%) - uključene su kao alat za daljnje
+  istraživanje, ne kao preporuka (vidi "Stepenice - pošten nalaz" i "Stepenice v2 - pošten nalaz"
+  iznad za potpun rezultat).
 - "Wall Street"/zlato podaci pokrivaju tri indeksa i zlato preko Stooq-a, dnevna rezolucija. Stooq
   simboli (`^spx`, `^dji`, `^ndq`, `xauusd`) su standardna Stooq notacija, ali **nisu uživo
   potvrđeni IZ OVOG razvojnog okruženja** - direktan test odavde dobiva HTTP 404/connection reset

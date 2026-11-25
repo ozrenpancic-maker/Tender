@@ -10,9 +10,13 @@ niske vrijednosti, pa bi trebao manje preklapati s dubokim padom koji TEK počin
 
 Long-only (bez shortanja), isti troškovni model kao sve ostale strategije u ovom projektu.
 
-STATUS: tek dodano, validacija kroz više odvojenih povijesnih razdoblja (ne samo jedan in-sample/
-out-of-sample par) je u tijeku - vidi README "Stepenice v2" za rezultat kad bude dostupan. NE
-pretpostavljaj da DEFAULT_PARAMS ispod rade dok README ne pokaže brojke."""
+POŠTEN REZULTAT (vidi README "Stepenice v2" za potpun nalaz): ovo je GORE od prve verzije
+(Bollingerove vrpce) - presjek preko granice prenisprodanosti/prekupljenosti okida se prečesto
+(130-290 trgovina kroz 9-24 mjeseca, otprilike svaka 2-5 dana), a naknade (~1% round-trip) na toliko
+trgovina jedu gotovo sav kapital. Grid pretraga 81 kombinacije na BTC/USDT satnim svijećama - NAJBOLJA
+pronađena kombinacija izgubila je ~94% in-sample i ~90% out-of-sample. Nijedna testirana kombinacija
+nije bila blizu profitabilnosti. NE koristi ovu strategiju - uključena je isključivo kao
+dokumentirani negativan nalaz (druga strategija koja ovo isprobava drugim mehanizmom)."""
 from app.indicators import sma, stochastic_rsi
 from app.strategies.base import Decision, StrategyContext
 
