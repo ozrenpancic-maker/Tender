@@ -31,8 +31,15 @@ def decide(ctx: StrategyContext) -> Decision:
         return "hold"
 
     trend_ma = sma(closes, trend_period)
-    k_now = stochastic_rsi(closes, rsi_period, stoch_period)
-    k_prev = stochastic_rsi(closes[:-1], rsi_period, stoch_period)
+    # stochastic_rsi() interno računa rsi_series() preko CIJELOG niza koji mu se da - ako bismo
+    # proslijedili rastući `closes` (sva povijest do sad), svaki poziv bi bio O(n), a decide() se
+    # zove O(n) puta kroz backtest => O(n^2)/O(n^3) ukupno (stvarno izmjereno: >30 min, nije
+    # završilo). Rješenje: proslijedi samo zadnjih `window` cijena - stochastic_rsi treba samo toliko
+    # povijesti da izračuna stabilan %K, rezultat je identičan jer rsi()/stochastic_rsi gledaju samo
+    # unatrag kroz fiksan broj perioda, nikad dalje.
+    window = rsi_period + stoch_period + 5
+    k_now = stochastic_rsi(closes[-window:], rsi_period, stoch_period)
+    k_prev = stochastic_rsi(closes[-window - 1 : -1], rsi_period, stoch_period)
     if trend_ma is None or k_now is None or k_prev is None:
         return "hold"
 
