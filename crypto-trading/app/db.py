@@ -37,6 +37,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
     except sqlite3.OperationalError:
         pass  # stupac već postoji
     for ddl in [
+        "ALTER TABLE auto_trader_run ADD COLUMN trade_mode TEXT NOT NULL DEFAULT 'scalp'",
+        "ALTER TABLE auto_trader_run ADD COLUMN min_hold_periods INTEGER NOT NULL DEFAULT 1",
+        "ALTER TABLE auto_trader_run ADD COLUMN take_profit_pct REAL",
+        "ALTER TABLE auto_trader_run ADD COLUMN stop_loss_pct REAL",
         "ALTER TABLE paper_run ADD COLUMN execution_mode TEXT NOT NULL DEFAULT 'taker'",
         "ALTER TABLE paper_run ADD COLUMN pending_side TEXT",
         "ALTER TABLE paper_run ADD COLUMN pending_limit_price REAL",

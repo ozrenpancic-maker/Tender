@@ -389,11 +389,37 @@
         <label>Max po coinu (%)</label>
         <input type="number" id="atMaxPct" value="20" min="1" max="100" />
       </div>
+      <div class="field">
+        <label>Način rada</label>
+        <select id="atTradeMode">
+          <option value="scalp">Scalp (izlazi čim AI signal padne na prodaju)</option>
+          <option value="swing">Swing (drži kroz manje oscilacije)</option>
+        </select>
+      </div>
       <button id="atStart">Pokreni auto-trader</button>
     </div>
+    <div class="row" id="atSwingFields" style="display:none">
+      <div class="field">
+        <label>Min. broj perioda prije izlaska na signal</label>
+        <input type="number" id="atMinHold" value="6" min="1" />
+      </div>
+      <div class="field">
+        <label>Profit cilj % (prazno = isključeno)</label>
+        <input type="number" id="atTakeProfit" placeholder="npr. 5" min="1" max="199" />
+      </div>
+      <div class="field">
+        <label>Stop-loss % (prazno = isključeno, ali preporučeno)</label>
+        <input type="number" id="atStopLoss" placeholder="npr. 5" min="1" max="99" />
+      </div>
+    </div>
+    <p class="muted" id="atSwingNote" style="display:none">
+      Swing način rada NIJE backtestiran (AI Prediction Engine radi isključivo uživo, nema
+      povijesnog replaya) - promatraj ga kao i ostatak auto-tradera, oprezno. Stop-loss djeluje
+      uvijek, čak i prije isteka minimalnog razdoblja držanja.
+    </p>
     <table id="atTable" style="display:none">
       <thead>
-        <tr><th>#</th><th>Horizont</th><th>Status</th><th>Trenutna vrijednost</th><th>Otvorene pozicije</th><th>Akcija</th></tr>
+        <tr><th>#</th><th>Horizont</th><th>Način rada</th><th>Status</th><th>Trenutna vrijednost</th><th>Otvorene pozicije</th><th>Akcija</th></tr>
       </thead>
       <tbody></tbody>
     </table>

@@ -806,6 +806,38 @@ novca), pravog automatiziranog tradinga uz jasno upozorenje o riziku, ili samo r
   da se prvo ponovno napiše `live_engine.py` (uklonjen, vidi pravilo ispod) i autenticirani
   Coinbase klijent.
 
+### Swing način rada (`trade_mode="swing"`)
+
+Korisnik je tražio da auto-trader ima i "swing trade" opciju. Dvije stvari je bitno razlučiti prije
+nego se objasni što je napravljeno:
+
+- **24h/7d horizonti i dalje NISU validirani** (provjereno uživo prije ovog dodatka: 24h Brier
+  score 0.51349 nasuprot bazne linije 0.51368 - ispod praga od 2% relativnog poboljšanja koji
+  `beats_baseline()` traži; 7d jasno gori, 0.55088 nasuprot 0.54369). Swing način rada NE koristi
+  te horizonte - i dalje radi isključivo na `1h`/`4h` (jedini validirani), isto kao i scalp način.
+- Umjesto duljeg horizonta, "swing" ovdje znači **drugačija disciplina držanja pozicije** na ISTOM
+  validiranom 1h/4h signalu: ne izlazi čim AI Score na trenutak padne na SELL/STRONG SELL (kao
+  scalp), nego drži kroz manje oscilacije dok ne prođe zadano `min_hold_periods` horizont-perioda
+  OD ULASKA.
+
+Pravila izlaska u swing načinu (provjeravaju se svaki put kad dođe nova horizont-periodna odluka):
+1. **Stop-loss djeluje UVIJEK**, čak i prije isteka `min_hold_periods` - sigurnosni izlaz se ne
+   odgađa zbog "drži kroz oscilacije" discipline.
+2. Nakon proteka `min_hold_periods`: izlazi na dosegnut **profit cilj** (`take_profit_pct`) ILI na
+   AI **SELL/STRONG SELL** signal, što prije nastupi.
+3. Prije isteka `min_hold_periods` (i bez probijenog stop-lossa): **ništa ne radi**, čak i da AI
+   Score padne na SELL - to je upravo razlika naspram scalp načina.
+
+**POŠTENO OGRANIČENJE**: swing način rada NIJE backtestiran i ne postoji plan da bude - AI
+Prediction Engine računa predikciju UŽIVO (poziva se na trenutnu Coinbase cijenu), nema povijesnog
+"replaya" predikcija kroz prošlost kao što rule-based strategije imaju u `app/backtest.py`.
+Backtestiranje bi zahtijevalo ili spremanje predikcija svaki sat unaprijed (još ne postoji) ili
+ponovno treniranje modela na "zamrznutom" skupu podataka za svaku točku u prošlosti (skupo,
+nije napravljeno). Dok se to ne napravi, swing način rada je **isto toliko neprovjeren kao i sam
+auto-trader prije njega** - promatraj ga, ne vjeruj mu unaprijed. Zadane vrijednosti u dashboardu
+(`min_hold_periods=6`, bez profit cilja, stop-loss prazan ali preporučen) su razumne pretpostavke,
+ne rezultat ikakve optimizacije.
+
 ## Stepenice (`app/strategies/stair_step_swing.py`) - pošten nalaz
 
 Korisnik je tražio bota koji "lovi stepenice": u uzlaznom trendu cijena malo raste pa malo padne pa

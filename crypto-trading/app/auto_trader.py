@@ -9,7 +9,17 @@ novac u ovom projektu.
 
 Koristi SAMO validirane horizonte (1h/4h - vidi data/models/metadata.json). Ako horizont prestane
 biti validiran nakon ponovnog treniranja, run se automatski zaustavlja umjesto da nastavi "trgovati"
-na nevalidiranom modelu.
+na nevalidiranom modelu. 24h/7d NISU validirani (provjereno uživo: 24h Brier 0.51349 vs bazna
+0.51368 - ispod praga poboljšanja; 7d jasno gori od bazne linije) - "swing" način rada ispod i dalje
+koristi SAMO 1h/4h signal, ne te horizonte (vidi README "Swing način rada" za potpuno objašnjenje).
+
+DVA NAČINA RADA (`trade_mode`):
+- "scalp" (zadano, dosadašnje ponašanje): zatvara poziciju ČIM AI signal za taj coin padne na
+  SELL/STRONG SELL, bez minimalnog vremena držanja ni fiksnog profit cilja/stop-lossa.
+- "swing": drži poziciju KROZ manje oscilacije (ne reagira na svaki pad AI Score-a) dok ne prođe
+  `min_hold_periods` horizont-perioda OD ULASKA, a izlazi prije toga SAMO na stop-loss (sigurnosni
+  izlaz uvijek radi, čak i prije isteka minimalnog držanja). Nakon proteka minimalnog razdoblja,
+  izlazi na AI SELL/STRONG SELL signal ILI na dosegnut profit cilj, što prije nastupi.
 """
 import json
 import threading
@@ -105,15 +115,37 @@ def _tick(run_id: int) -> None:
         cash = run["cash_eur"]
 
         # 1) Izlasci prvo - oslobodi gotovinu prije eventualnih novih ulazaka.
+        trade_mode = run["trade_mode"]
         for pos in open_positions:
             pred = predictions.get(pos["pair"])
-            if not pred or pred["decision"] not in SELL_CATEGORIES:
-                continue
             try:
                 ticker = coinbase_client.get_public_ticker(coinbase_client.to_product_id(pos["pair"]))
             except Exception as err:
-                print(f"[auto_trader] run {run_id}: ne mogu prodati {pos['pair']} ({err}) - pokušat ću sljedeći tick.")
+                print(f"[auto_trader] run {run_id}: ne mogu provjeriti/prodati {pos['pair']} ({err}) - pokušat ću sljedeći tick.")
                 continue
+
+            exit_reason = None
+            if trade_mode == "swing":
+                held_periods = (now - pos["opened_at"]) // bucket_seconds
+                gain = ticker["bid"] / pos["entry_price"] - 1
+                stop_loss_pct = run["stop_loss_pct"]
+                take_profit_pct = run["take_profit_pct"]
+                if stop_loss_pct and gain <= -stop_loss_pct:
+                    exit_reason = "swing stop-loss"
+                elif held_periods >= run["min_hold_periods"]:
+                    if take_profit_pct and gain >= take_profit_pct:
+                        exit_reason = "swing profit cilj"
+                    elif pred and pred["decision"] in SELL_CATEGORIES:
+                        exit_reason = "AI signal (nakon min. držanja)"
+                # ispod min_hold_periods i bez probijenog stop-lossa - DRŽI kroz manju oscilaciju,
+                # ne reagira na svaki pad AI Score-a (to je bit "swing" načina rada)
+            else:  # "scalp" - dosadašnje ponašanje, bez minimalnog držanja ni TP/SL
+                if pred and pred["decision"] in SELL_CATEGORIES:
+                    exit_reason = "AI signal"
+
+            if exit_reason is None:
+                continue
+
             fill = taker_sell_fill(ticker["bid"])
             proceeds = pos["quantity_base"] * fill * (1 - TAKER_FEE)
             cash += proceeds
@@ -121,10 +153,12 @@ def _tick(run_id: int) -> None:
                 "UPDATE auto_trader_position SET closed_at=?, exit_price=?, exit_eur=? WHERE id=?",
                 (now, fill, round(proceeds, 4), pos["id"]),
             )
+            decision_label = pred["decision"] if pred else exit_reason
+            ai_score = pred["ai_score"] if pred else None
             conn.execute(
                 "INSERT INTO auto_trader_trade (run_id, pair, side, price, amount_eur, ai_score, decision, executed_at)"
                 " VALUES (?, ?, 'sell', ?, ?, ?, ?, ?)",
-                (run_id, pos["pair"], fill, round(proceeds, 4), pred["ai_score"], pred["decision"], now),
+                (run_id, pos["pair"], fill, round(proceeds, 4), ai_score, f"{decision_label} ({exit_reason})", now),
             )
             held_pairs.discard(pos["pair"])
 
@@ -181,20 +215,40 @@ def _loop(run_id: int, stop_event: threading.Event) -> None:
         stop_event.wait(POLL_INTERVAL_SECONDS)
 
 
-def start_run(horizon: str, universe: list[str], starting_balance: float, max_position_pct: float) -> int:
+VALID_TRADE_MODES = {"scalp", "swing"}
+
+
+def start_run(
+    horizon: str, universe: list[str], starting_balance: float, max_position_pct: float,
+    trade_mode: str = "scalp", min_hold_periods: int = 1,
+    take_profit_pct: float | None = None, stop_loss_pct: float | None = None,
+) -> int:
     if horizon not in HORIZON_SECONDS:
         raise ValueError(f"Nepodržan horizont '{horizon}'. Dostupno: {list(HORIZON_SECONDS)}")
     if not 0 < max_position_pct <= 1:
         raise ValueError("max_position_pct mora biti između 0 i 1 (npr. 0.2 = 20%).")
     if not universe:
         raise ValueError("Univerzum parova ne smije biti prazan.")
+    if trade_mode not in VALID_TRADE_MODES:
+        raise ValueError(f"Nepodržan trade_mode '{trade_mode}'. Dostupno: {sorted(VALID_TRADE_MODES)}")
+    if trade_mode == "swing":
+        if min_hold_periods < 1:
+            raise ValueError("min_hold_periods mora biti barem 1 za swing način rada.")
+        if take_profit_pct is not None and not 0 < take_profit_pct < 2:
+            raise ValueError("take_profit_pct mora biti između 0 i 2 (npr. 0.05 = 5%).")
+        if stop_loss_pct is not None and not 0 < stop_loss_pct < 1:
+            raise ValueError("stop_loss_pct mora biti između 0 i 1 (npr. 0.05 = 5%).")
 
     conn = db.get_connection()
     try:
         cur = conn.execute(
-            "INSERT INTO auto_trader_run (horizon, universe_json, starting_balance_eur, max_position_pct, started_at, status, cash_eur)"
-            " VALUES (?, ?, ?, ?, ?, 'running', ?)",
-            (horizon, json.dumps(universe), starting_balance, max_position_pct, int(time.time()), starting_balance),
+            "INSERT INTO auto_trader_run (horizon, universe_json, starting_balance_eur, max_position_pct, started_at,"
+            " status, cash_eur, trade_mode, min_hold_periods, take_profit_pct, stop_loss_pct)"
+            " VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, ?)",
+            (
+                horizon, json.dumps(universe), starting_balance, max_position_pct, int(time.time()), starting_balance,
+                trade_mode, min_hold_periods, take_profit_pct, stop_loss_pct,
+            ),
         )
         conn.commit()
         run_id = cur.lastrowid

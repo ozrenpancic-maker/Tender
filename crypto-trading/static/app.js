@@ -588,15 +588,29 @@ async function showPaperDetail(runId) {
 
 // ---------- Automatizirani paper trading (AI bira coin) ----------
 
+document.getElementById("atTradeMode").addEventListener("change", (e) => {
+  const isSwing = e.target.value === "swing";
+  document.getElementById("atSwingFields").style.display = isSwing ? "flex" : "none";
+  document.getElementById("atSwingNote").style.display = isSwing ? "block" : "none";
+});
+
 document.getElementById("atStart").addEventListener("click", async () => {
   const horizon = document.getElementById("atHorizon").value;
   const starting_balance = Number(document.getElementById("atBalance").value);
   const max_position_pct = Number(document.getElementById("atMaxPct").value) / 100;
+  const trade_mode = document.getElementById("atTradeMode").value;
+  const min_hold_periods = Number(document.getElementById("atMinHold").value) || 1;
+  const tpRaw = document.getElementById("atTakeProfit").value.trim();
+  const slRaw = document.getElementById("atStopLoss").value.trim();
+  const take_profit_pct = tpRaw ? Number(tpRaw) / 100 : null;
+  const stop_loss_pct = slRaw ? Number(slRaw) / 100 : null;
   try {
     await api("/api/auto-trader/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ horizon, starting_balance, max_position_pct }),
+      body: JSON.stringify({
+        horizon, starting_balance, max_position_pct, trade_mode, min_hold_periods, take_profit_pct, stop_loss_pct,
+      }),
     });
     refreshAutoTraderRuns();
   } catch (err) {
@@ -610,8 +624,9 @@ async function refreshAutoTraderRuns() {
   const tbody = table.querySelector("tbody");
   tbody.innerHTML = "";
   for (const run of runs) {
+    const modeLabel = run.trade_mode === "swing" ? "swing" : "scalp";
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${run.id}</td><td>${run.horizon}</td><td>${run.status}</td>
+    tr.innerHTML = `<td>${run.id}</td><td>${run.horizon}</td><td>${modeLabel}</td><td>${run.status}</td>
       <td>${fmtEur(run.current_equity_eur)}</td><td>${run.open_positions}</td><td></td>`;
     const actionCell = tr.querySelector("td:last-child");
     const viewBtn = document.createElement("button");
@@ -639,9 +654,13 @@ async function showAutoTraderDetail(runId) {
   const { run, trades, positions } = await api(`/api/auto-trader/${runId}`);
   const universe = JSON.parse(run.universe_json);
   const el = document.getElementById("atDetail");
+  const modeLine =
+    run.trade_mode === "swing"
+      ? `Način rada: <strong>swing</strong> (min. ${run.min_hold_periods} perioda, profit cilj ${run.take_profit_pct ? fmtPct(run.take_profit_pct * 100) : "isključen"}, stop-loss ${run.stop_loss_pct ? fmtPct(run.stop_loss_pct * 100) : "isključen"}).`
+      : "Način rada: <strong>scalp</strong>.";
   el.innerHTML = `<h3>Run #${run.id} — ${run.horizon}</h3>
     <p class="muted">Pokrenut ${new Date(run.started_at * 1000).toLocaleString("hr-HR")}. Univerzum: ${universe.join(", ")}.
-    Gotovina: ${fmtEur(run.cash_eur)}. ${trades.length} trgovina.</p>`;
+    Gotovina: ${fmtEur(run.cash_eur)}. ${trades.length} trgovina. ${modeLine}</p>`;
   if (positions.filter((p) => !p.closed_at).length) {
     const list = document.createElement("table");
     list.innerHTML = `<thead><tr><th>Par</th><th>Ušao</th><th>Ulog</th></tr></thead><tbody>${positions

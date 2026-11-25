@@ -409,6 +409,10 @@ class AutoTraderStartRequest(BaseModel):
     universe: list[str] = []  # prazno = korisnikov portfolio (PORTFOLIO_PAIRS)
     starting_balance: float = 1000.0
     max_position_pct: float = 0.2  # 20% budžeta po coinu
+    trade_mode: str = "scalp"  # "scalp" (zadano) ili "swing" (drži kroz manje oscilacije)
+    min_hold_periods: int = 1  # samo za swing - min. broj horizont-perioda prije AI-signal izlaska
+    take_profit_pct: float | None = None  # samo za swing, npr. 0.05 = 5%
+    stop_loss_pct: float | None = None  # samo za swing, npr. 0.05 = 5% - radi uvijek, čak i prije min_hold_periods
 
 
 @app.post("/api/auto-trader/start")
@@ -424,7 +428,10 @@ def auto_trader_start(req: AutoTraderStartRequest):
         )
     universe = req.universe or list(binance_history_client.PORTFOLIO_PAIRS)
     try:
-        run_id = auto_trader.start_run(req.horizon, universe, req.starting_balance, req.max_position_pct)
+        run_id = auto_trader.start_run(
+            req.horizon, universe, req.starting_balance, req.max_position_pct,
+            req.trade_mode, req.min_hold_periods, req.take_profit_pct, req.stop_loss_pct,
+        )
         return {"run_id": run_id}
     except ValueError as err:
         raise HTTPException(400, str(err))
