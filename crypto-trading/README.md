@@ -564,6 +564,15 @@ Gumb "Osvježi sve" u zaglavlju odmah pokreće sve četiri odjednom. Testovi vez
 (Coinbase, Wall Street, makro izvori, Binance povijest) ostaju ručni - to su mrežno/vremenski skuplje
 radnje s nuspojavama (upis u bazu), namjerno se ne pokreću same.
 
+**Dashboard je organiziran u 4 taba** (umjesto 11 odjeljaka nabacanih jedan ispod drugog): "Pregled"
+(AI Prediction Engine + Signali - ono što svakodnevno provjeravaš, zadano otvoren), "Trgovanje"
+(Paper trading + Automatizirani paper trading), "Analiza" (Backtest usporedba + Optimizator),
+"Podaci i veze" (sinkronizacija portfelja, Wall Street, makro/sentiment izvori, Coinbase veza).
+Zadnje otvoren tab se pamti (localStorage) - stranica se sljedeći put otvori na istom mjestu. Duži
+objašnjavajući tekstovi po odjeljku su sklonjeni iza "ℹ️ Što ovo znači" sklopivog izbornika (sadržaj
+je identičan, samo nije nabačen u lice prije nego vidiš gumbe/tablicu) - poštene napomene o
+ograničenjima nisu izgubljene, samo nisu zadane vidljive.
+
 ## Android (instalacija na telefon preko lokalne mreže)
 
 Dashboard je postavljen kao PWA (manifest + ikone + service worker, vidi `static/manifest.json` i

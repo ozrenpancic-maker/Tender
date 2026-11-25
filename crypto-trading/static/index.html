@@ -23,6 +23,12 @@
     <span id="lastRefreshedAt" class="muted"></span>
   </div>
 </header>
+<nav class="tab-nav" id="tabNav">
+  <button class="tab-btn" data-tab-target="pregled">📊 Pregled</button>
+  <button class="tab-btn" data-tab-target="trgovanje">💹 Trgovanje</button>
+  <button class="tab-btn" data-tab-target="analiza">🔬 Analiza</button>
+  <button class="tab-btn" data-tab-target="podaci">🔌 Podaci i veze</button>
+</nav>
 <main>
 
   <section id="liveStatusSection">
@@ -41,18 +47,21 @@
     </div>
   </section>
 
-  <section>
+  <section data-tab="pregled">
     <h2>1. AI Prediction Engine (ML, kalibrirane vjerojatnosti)</h2>
-    <p class="muted">
-      LightGBM + logistička regresija, 4 neovisna horizonta (1h/4h/24h/7d), walk-forward validirano
-      protiv naivne bazne linije (vjerojatnost = udio klasa u treningu) - vidi README "AI Prediction
-      Engine" za potpunu metodologiju. <strong>POŠTENO STANJE:</strong> na prvom treniranju nad
-      podacima dostupnim u ovom razvojnom okruženju (BTC/ETH/SOL), <strong>nijedan od 4 horizonta
-      nije prošao validaciju</strong> - model nije značajno bolji od "ne znam ništa" bazne linije.
-      To znači da ovaj odjeljak trenutno vraća "NEMA DOVOLJNO POUZDANIH PODATAKA" za sve - to je
-      namjerno ponašanje (pravilo da nevalidiran model ne glumi da radi), ne greška. Ne izmišlja se
-      AI Score ni vjerojatnost dok validacija ne prođe.
-    </p>
+    <details class="info-toggle">
+      <summary>Što ovo znači</summary>
+      <p class="muted">
+        LightGBM + logistička regresija, 4 neovisna horizonta (1h/4h/24h/7d), walk-forward validirano
+        protiv naivne bazne linije (vjerojatnost = udio klasa u treningu) - vidi README "AI Prediction
+        Engine" za potpunu metodologiju. <strong>POŠTENO STANJE:</strong> na prvom treniranju nad
+        podacima dostupnim u ovom razvojnom okruženju (BTC/ETH/SOL), <strong>nijedan od 4 horizonta
+        nije prošao validaciju</strong> - model nije značajno bolji od "ne znam ništa" bazne linije.
+        To znači da ovaj odjeljak trenutno vraća "NEMA DOVOLJNO POUZDANIH PODATAKA" za sve - to je
+        namjerno ponašanje (pravilo da nevalidiran model ne glumi da radi), ne greška. Ne izmišlja se
+        AI Score ni vjerojatnost dok validacija ne prođe.
+      </p>
+    </details>
     <button id="predRefresh">Osvježi AI predikcije</button>
     <div id="predStatus" class="muted" style="margin-top:8px"></div>
     <table id="predTable" style="display:none">
@@ -66,17 +75,20 @@
     </table>
   </section>
 
-  <section>
+  <section data-tab="pregled">
     <h2>2. Signali kupi/prodaj</h2>
-    <p class="muted">
-      Trenutna (uživo) odluka mehaničke strategije za svaki coin iz portfelja, u dva horizonta.
-      <strong>Ovo nisu preporuke financijskog savjetnika i mogu biti u krivu.</strong> Kratkoročni
-      preset na jedinom stvarnom testu koji imamo (BTC/ETH/SOL, 3,5 mjeseca) gubio je dio dobiti u
-      jakom usponu, ali je dramatično ograničio gubitak u padu — svjestan kompromis, ne zajamčena
-      prednost, i nije testiran na ovim konkretnim coinovima. "Drži/Prodaj" stupac pretpostavlja da
-      coin već imaš (točno za tvoj portfolio); "Kupi/Čekaj" stupac pokazuje što bi signal rekao da
-      ga nemaš (npr. za dokup).
-    </p>
+    <details class="info-toggle">
+      <summary>Što ovo znači</summary>
+      <p class="muted">
+        Trenutna (uživo) odluka mehaničke strategije za svaki coin iz portfelja, u dva horizonta.
+        <strong>Ovo nisu preporuke financijskog savjetnika i mogu biti u krivu.</strong> Kratkoročni
+        preset na jedinom stvarnom testu koji imamo (BTC/ETH/SOL, 3,5 mjeseca) gubio je dio dobiti u
+        jakom usponu, ali je dramatično ograničio gubitak u padu — svjestan kompromis, ne zajamčena
+        prednost, i nije testiran na ovim konkretnim coinovima. "Drži/Prodaj" stupac pretpostavlja da
+        coin već imaš (točno za tvoj portfolio); "Kupi/Čekaj" stupac pokazuje što bi signal rekao da
+        ga nemaš (npr. za dokup).
+      </p>
+    </details>
     <button id="sigRefresh">Osvježi signale</button>
     <div id="sigStatus" class="muted" style="margin-top:8px"></div>
     <table id="sigTable" style="display:none">
@@ -91,15 +103,18 @@
     </table>
   </section>
 
-  <section>
+  <section data-tab="podaci">
     <h2>3. Tvoj portfolio — sinkroniziraj povijest</h2>
-    <p class="muted">
-      Backtest i optimizator rade samo nad parovima koji su već sinkronizirani u bazu. Izvorna baza
-      pokriva BTC/ETH/SOL - za ostale coinove (npr. iz tvog stvarnog portfelja) prvo ih sinkroniziraj
-      ovdje preko javnog Binance API-ja, besplatno, bez ključa. "Dust" pozicije (ispod par centi -
-      naknade bi pojele svaku dobit) namjerno nisu uključene u popis ispod; sinkroniziraj ih ručno
-      dolje ako svejedno želiš, upisujući par kao "SYMBOL/USDT".
-    </p>
+    <details class="info-toggle">
+      <summary>Što ovo znači</summary>
+      <p class="muted">
+        Backtest i optimizator rade samo nad parovima koji su već sinkronizirani u bazu. Izvorna baza
+        pokriva BTC/ETH/SOL - za ostale coinove (npr. iz tvog stvarnog portfelja) prvo ih sinkroniziraj
+        ovdje preko javnog Binance API-ja, besplatno, bez ključa. "Dust" pozicije (ispod par centi -
+        naknade bi pojele svaku dobit) namjerno nisu uključene u popis ispod; sinkroniziraj ih ručno
+        dolje ako svejedno želiš, upisujući par kao "SYMBOL/USDT".
+      </p>
+    </details>
     <div class="row">
       <div class="field">
         <label>Interval svijeća</label>
@@ -121,14 +136,17 @@
     <div id="bhResult" style="margin-top:12px"></div>
   </section>
 
-  <section>
+  <section data-tab="analiza">
     <h2>4. Usporedba strategija (backtest na povijesnim podacima)</h2>
-    <p class="muted">
-      Bazno pravilo iz priloženog izvještaja (kupi na +2% dnevni signal) u testiranom razdoblju <strong>gubi novac</strong>
-      (500&nbsp;€ → 108,41&nbsp;€, pad 79,11%). Ovdje možeš testirati druge strategije i uvijek ih usporediti s
-      "buy &amp; hold" (samo kupi i drži) — aktivna strategija ima smisla jedino ako ga nadmaši uz prihvatljiv rizik.
-      Mali broj trgovina u ovim testovima (10–30) znači da rezultat lako može biti slučajnost, ne dokazana prednost.
-    </p>
+    <details class="info-toggle">
+      <summary>Što ovo znači</summary>
+      <p class="muted">
+        Bazno pravilo iz priloženog izvještaja (kupi na +2% dnevni signal) u testiranom razdoblju <strong>gubi novac</strong>
+        (500&nbsp;€ → 108,41&nbsp;€, pad 79,11%). Ovdje možeš testirati druge strategije i uvijek ih usporediti s
+        "buy &amp; hold" (samo kupi i drži) — aktivna strategija ima smisla jedino ako ga nadmaši uz prihvatljiv rizik.
+        Mali broj trgovina u ovim testovima (10–30) znači da rezultat lako može biti slučajnost, ne dokazana prednost.
+      </p>
+    </details>
     <div class="row">
       <div class="field">
         <label>Par</label>
@@ -184,13 +202,16 @@
     </details>
   </section>
 
-  <section>
+  <section data-tab="podaci">
     <h2>5. Wall Street i zlato (S&amp;P 500, Dow, Nasdaq, zlato)</h2>
-    <p class="muted">
-      Dnevni podaci s javnog Stooq izvora, bez ključa. Strategije s makro filterom (odjeljak 4) koriste ovo da
-      kripto signal propuste samo kad je makro okruženje "risk-on". Korelacija kripta s dioničkim tržištem/zlatom
-      nije zajamčena da će se nastaviti — ovo je alat za testiranje te ideje, ne potvrđena strategija.
-    </p>
+    <details class="info-toggle">
+      <summary>Što ovo znači</summary>
+      <p class="muted">
+        Dnevni podaci s javnog Stooq izvora, bez ključa. Strategije s makro filterom (odjeljak 4) koriste ovo da
+        kripto signal propuste samo kad je makro okruženje "risk-on". Korelacija kripta s dioničkim tržištem/zlatom
+        nije zajamčena da će se nastaviti — ovo je alat za testiranje te ideje, ne potvrđena strategija.
+      </p>
+    </details>
     <div class="row">
       <button class="secondary" id="eqTest">Testiraj vezu</button>
       <button id="eqSyncAll">Sinkroniziraj sve (SPX, DJI, NDQ, GOLD)</button>
@@ -198,20 +219,23 @@
     <div id="eqResult" style="margin-top:12px"></div>
   </section>
 
-  <section>
+  <section data-tab="podaci">
     <h2>6. Makro, sentiment i regulativa</h2>
-    <p class="muted">
-      Besplatni izvori: <strong>FRED</strong> (Fed stopa/CPI/nezaposlenost/M2/prinosi na obveznice — treba
-      besplatan FRED_API_KEY), <strong>DeFiLlama</strong> (TVL, bez ključa), <strong>CoinGecko</strong>
-      (ponuda tokena, bez ključa), <strong>Binance futures</strong> (funding rate — povijest godinama
-      unatrag, bez ključa) i <strong>GitHub</strong> (aktivnost razvoja, bez ključa ili s besplatnim
-      tokenom za viši limit). Sivo područje (neslužbeno/krhko ili grub leksikon):
-      <strong>Google Trends</strong> (neslužbeni scraping), <strong>Reddit</strong> i
-      <strong>regulativa</strong> (grubo brojanje riječi), <strong>CryptoPanic</strong> (stvarni glasovi
-      zajednice, treba besplatnu registraciju) i <strong>ETF tokovi</strong> (scraping farside.co.uk).
-      Leksikonski dijelovi nisu pravna ni NLP analiza — tretiraj kao grub signal, ne zaključak.
-      Koriste ih strategije "Makro glasovanje" i "Derivati - funding rate ekstremi" (odjeljak 4).
-    </p>
+    <details class="info-toggle">
+      <summary>Što ovo znači</summary>
+      <p class="muted">
+        Besplatni izvori: <strong>FRED</strong> (Fed stopa/CPI/nezaposlenost/M2/prinosi na obveznice — treba
+        besplatan FRED_API_KEY), <strong>DeFiLlama</strong> (TVL, bez ključa), <strong>CoinGecko</strong>
+        (ponuda tokena, bez ključa), <strong>Binance futures</strong> (funding rate — povijest godinama
+        unatrag, bez ključa) i <strong>GitHub</strong> (aktivnost razvoja, bez ključa ili s besplatnim
+        tokenom za viši limit). Sivo područje (neslužbeno/krhko ili grub leksikon):
+        <strong>Google Trends</strong> (neslužbeni scraping), <strong>Reddit</strong> i
+        <strong>regulativa</strong> (grubo brojanje riječi), <strong>CryptoPanic</strong> (stvarni glasovi
+        zajednice, treba besplatnu registraciju) i <strong>ETF tokovi</strong> (scraping farside.co.uk).
+        Leksikonski dijelovi nisu pravna ni NLP analiza — tretiraj kao grub signal, ne zaključak.
+        Koriste ih strategije "Makro glasovanje" i "Derivati - funding rate ekstremi" (odjeljak 4).
+      </p>
+    </details>
     <div class="row">
       <button class="secondary" id="macroTest">Testiraj sve veze</button>
     </div>
@@ -219,15 +243,18 @@
     <div id="macroResult" style="margin-top:12px"></div>
   </section>
 
-  <section>
+  <section data-tab="analiza">
     <h2>7. Optimizacija parametara (in-sample / out-of-sample)</h2>
-    <p class="muted">
-      Pretražuje kombinacije parametara na "in-sample" razdoblju i rangira ih po rezultatu, zatim
-      par najboljih provjerava na "out-of-sample" razdoblju koje optimizacija nije vidjela.
-      <strong>Vjeruj samo kombinacijama koje rade dobro na OBA razdoblja</strong> — nešto što radi
-      sjajno samo na in-sample a loše na out-of-sample je gotovo sigurno slučajnost (curve fitting),
-      ne stvarna prednost. Čak i uspjeh na oba razdoblja nije jamstvo za budućnost.
-    </p>
+    <details class="info-toggle">
+      <summary>Što ovo znači</summary>
+      <p class="muted">
+        Pretražuje kombinacije parametara na "in-sample" razdoblju i rangira ih po rezultatu, zatim
+        par najboljih provjerava na "out-of-sample" razdoblju koje optimizacija nije vidjela.
+        <strong>Vjeruj samo kombinacijama koje rade dobro na OBA razdoblja</strong> — nešto što radi
+        sjajno samo na in-sample a loše na out-of-sample je gotovo sigurno slučajnost (curve fitting),
+        ne stvarna prednost. Čak i uspjeh na oba razdoblja nije jamstvo za budućnost.
+      </p>
+    </details>
     <div class="row">
       <div class="field">
         <label>Strategija</label>
@@ -273,15 +300,21 @@
     </table>
   </section>
 
-  <section>
+  <section data-tab="podaci">
     <h2>8. Coinbase veza</h2>
-    <p class="muted">Isključivo javni, read-only cjenovni feed, bez ključa. Autenticirani dio (stanje računa, slanje naloga) je uklonjen iz koda (KriptoMVP 4.4 pravila) - vidi README "Isključivo savjetnik/simulator".</p>
+    <details class="info-toggle">
+      <summary>Što ovo znači</summary>
+      <p class="muted">Isključivo javni, read-only cjenovni feed, bez ključa. Autenticirani dio (stanje računa, slanje naloga) je uklonjen iz koda (KriptoMVP 4.4 pravila) - vidi README "Isključivo savjetnik/simulator".</p>
+    </details>
     <button id="cbTest">Testiraj vezu</button>
     <div id="cbResult" style="margin-top:12px"></div>
   </section>
 
-  <section>
+  <section data-tab="trgovanje">
     <h2>9. Paper trading (simulacija na živim cijenama, bez pravog novca)</h2>
+    <p class="muted" style="margin-top:0">
+      Ovdje ni "Live trgovanje" opcija ne postoji - namjerno (vidi gornju poruku). Samo simulacija.
+    </p>
     <div class="row">
       <div class="field">
         <label>Strategija</label>
@@ -329,14 +362,17 @@
     <div id="ppDetail"></div>
   </section>
 
-  <section>
+  <section data-tab="trgovanje">
     <h2>10. Automatizirani paper trading (AI sam bira coin)</h2>
-    <p class="muted">
-      AI Prediction Engine (odjeljak 1) svaki sat/4h sam rangira sve coinove iz portfolija po AI
-      Score-u i odlučuje kupnju/prodaju - i dalje isključivo simulacija, bez pravog novca i bez
-      Coinbase trgovačkih ključeva (vidi README "Automatizirani paper trading"). Koristi se samo
-      validirani horizont (1h ili 4h).
-    </p>
+    <details class="info-toggle">
+      <summary>Što ovo znači</summary>
+      <p class="muted">
+        AI Prediction Engine (odjeljak 1) svaki sat/4h sam rangira sve coinove iz portfolija po AI
+        Score-u i odlučuje kupnju/prodaju - i dalje isključivo simulacija, bez pravog novca i bez
+        Coinbase trgovačkih ključeva (vidi README "Automatizirani paper trading"). Koristi se samo
+        validirani horizont (1h ili 4h).
+      </p>
+    </details>
     <div class="row">
       <div class="field">
         <label>Horizont</label>
@@ -364,15 +400,6 @@
     <div id="atDetail"></div>
   </section>
 
-  <section>
-    <h2>11. Live trgovanje</h2>
-    <p class="muted">
-      Namjerno uklonjeno (KriptoMVP 4.4 nepromjenjiva pravila) - aplikacija je isključivo savjetnik
-      i simulator. Ne postoji kod koji šalje prave naloge niti traži Coinbase trgovačke API
-      ključeve ili pristup računu/novčaniku. Koristi "Paper trading" (odjeljak 9) ili "Automatizirani
-      paper trading" (odjeljak 10) za simulaciju.
-    </p>
-  </section>
 
 </main>
 <script src="/app.js"></script>

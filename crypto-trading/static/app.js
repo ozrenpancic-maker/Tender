@@ -53,6 +53,34 @@ function fmtPct(n) {
   return `${Number(n).toFixed(1)}%`;
 }
 
+// ---------- Tabovi (grupiraju odjeljke u par pregleda, bez mijenjanja postojeće logike) ----------
+
+function setActiveTab(tab) {
+  document.querySelectorAll("main > section[data-tab]").forEach((el) => {
+    el.classList.toggle("active-tab", el.dataset.tab === tab);
+  });
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.tabTarget === tab);
+  });
+  try {
+    localStorage.setItem("dashboardTab", tab);
+  } catch {
+    // localStorage nedostupan - tab se jednostavno neće pamtiti između posjeta.
+  }
+}
+
+document.querySelectorAll(".tab-btn").forEach((btn) => {
+  btn.addEventListener("click", () => setActiveTab(btn.dataset.tabTarget));
+});
+
+let savedTab = "pregled";
+try {
+  savedTab = localStorage.getItem("dashboardTab") || "pregled";
+} catch {
+  // localStorage nedostupan - zadano na "pregled".
+}
+setActiveTab(savedTab);
+
 // ---------- Init ----------
 
 let STRATEGIES = [];
