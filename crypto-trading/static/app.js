@@ -953,6 +953,36 @@ async function refreshPredictions() {
 
 document.getElementById("predRefresh").addEventListener("click", refreshPredictions);
 
+async function refreshRetrainLog() {
+  const { log } = await api("/api/predictions/retrain-log");
+  const table = document.getElementById("retrainLogTable");
+  const tbody = table.querySelector("tbody");
+  tbody.innerHTML = "";
+  for (const entry of log) {
+    for (const [horizon, d] of Object.entries(entry.decisions || {})) {
+      const tr = document.createElement("tr");
+      const badge = d.promoted ? '<span class="pill ok">promoviran</span>' : '<span class="pill">zadržan stari</span>';
+      tr.innerHTML = `<td>${entry.at_human}</td><td>${horizon}</td><td>${badge}</td><td class="muted" style="font-size:12px">${d.reason}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+  table.style.display = log.length ? "table" : "none";
+}
+
+document.getElementById("retrainNowBtn").addEventListener("click", async () => {
+  const statusEl = document.getElementById("retrainStatus");
+  statusEl.textContent = "Treniram... ovo može potrajati par minuta, ne zatvaraj stranicu.";
+  try {
+    await api("/api/predictions/retrain-now", { method: "POST" });
+    statusEl.textContent = "Gotovo.";
+    await refreshRetrainLog();
+  } catch (err) {
+    statusEl.textContent = "Greška: " + err.message;
+  }
+});
+
+refreshRetrainLog();
+
 init();
 
 if ("serviceWorker" in navigator) {

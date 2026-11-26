@@ -111,6 +111,52 @@ Zapisuje `data/models/<horizont>_lgbm.joblib` i `data/models/metadata.json` (wal
 `validated` zastavica koju `app/ml/engine.py` čita). Siguran je za ponovno pokretanje - briše i
 ponovno piše iste datoteke, ne mijenja ništa drugo u bazi.
 
+### Automatsko ponovno treniranje (`app/ml/retrain_scheduled.py`)
+
+Korisnik je pitao za "AI učenje" iz novih podataka uživo. Pravo "online learning" (model se mijenja
+sam od sebe iz svake nove opservacije u stvarnom vremenu) je NAMJERNO odbačeno - prerizično je
+(model bi se mogao tiho pogoršati, a label za "je li cijena porasla za 1h" se saznaje tek za 1h, pa
+nema stvarne prednosti brzine). Umjesto toga: periodično ponovno treniranje s **sigurnosnom
+"promotion gate"** - potpuno drugačiji, već dokazan pristup u kvantitativnim financijama:
+
+1. Osvježi zadnjih ~400 dana povijesnih svijeća za sve ML parove/intervale (`app/binance_history_client`).
+2. Treniraj svaki horizont u PRIVREMENI (staging) direktorij - uživo model još netaknut.
+3. Usporedi walk-forward Brier score kandidata s trenutnim uživo modelom.
+4. **Promoviraj (zamijeni uživo model) SAMO ako kandidat nije gori** - niže je bolje. Ako je gori,
+   ili ako kandidat IZGUBI validaciju koju je prijašnji model imao, stari model ostaje na snazi,
+   NEMA tihog pogoršanja.
+5. Zapiše jedan redak u `data/models/retrain_log.jsonl` (append, ne prepisuje) sa svakom odlukom i
+   zašto - vidljivo na dashboardu (odjeljak 1, "Automatsko ponovno treniranje").
+
+Pokreni ručno: `python3 -m app.ml.retrain_scheduled` (ili gumb "Pokreni ponovno treniranje sad" na
+dashboardu). Napomena: `app/ml/engine.py` sad provjerava datum izmjene (mtime) datoteka modela i
+metapodataka prije svake predikcije - promovirani model se primjenjuje ODMAH, bez potrebe za
+restartom servera.
+
+**Postavljanje tjednog automatskog pokretanja (Windows Task Scheduler)**:
+
+1. Napravi `retrain.bat` u `crypto-trading` folderu sa sadržajem (prilagodi putanju ako treba):
+   ```bat
+   @echo off
+   cd /d C:\kripto\Tender\crypto-trading
+   .venv\Scripts\python.exe -m app.ml.retrain_scheduled >> data\models\retrain_console.log 2>&1
+   ```
+2. Otvori **Task Scheduler** (Win+R → `taskschd.msc`).
+3. **Create Task...** (ne "Basic Task" - treba više opcija):
+   - General: ime npr. "Kripto AI retrain", "Run whether user is logged on or not".
+   - Triggers → New: Weekly, odaberi dan/vrijeme (npr. nedjelja 03:00 - kad server sigurno nije
+     zauzet drugim stvarima).
+   - Actions → New: Program/script = puna putanja do `retrain.bat`.
+   - Conditions: isključi "Start the task only if the computer is on AC power" ako je mini PC uvijek
+     na struji (jest, to mu je namjena).
+4. Testiraj odmah desnim klikom → "Run", provjeri `data\models\retrain_console.log` i
+   `data\models\retrain_log.jsonl` da je prošlo bez greške.
+
+**Pošteno ograničenje**: ovo zahtijeva da `uvicorn` server bude kasnije ponovno pokrenut barem
+jednom da pokupi python kod promjene (ako ih bude) - sam retrain POGAĐA žive modele datoteke dok
+server radi (zato mtime provjera gore), ne treba restart SAMO za novi model, ALI ako se ikad
+promijeni kod `app/ml/` modula, treba.
+
 ### Razlozi za/protiv (`reasons_for`/`reasons_against`)
 
 Koriste `shap.TreeExplainer` nad stvarnim LightGBM modelom (izvučenim iz `CalibratedClassifierCV`

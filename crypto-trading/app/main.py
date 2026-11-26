@@ -292,6 +292,27 @@ def prediction_horizons():
     }
 
 
+@app.get("/api/predictions/retrain-log")
+def prediction_retrain_log():
+    from app.ml.retrain_scheduled import read_log
+
+    return {"log": read_log()}
+
+
+@app.post("/api/predictions/retrain-now")
+def prediction_retrain_now():
+    """Ručno okini isto ono što tjedni Windows Task Scheduler zadatak radi - koristan za test
+    postavljanja prije nego se pouzda u automatiku (vidi README 'Automatsko ponovno treniranje').
+    Ovo stvarno trenira (desetke sekundi do par minuta) - NIJE instant, zato zaseban gumb, ne dio
+    normalnog osvježavanja dashboarda."""
+    from app.ml.retrain_scheduled import run
+
+    try:
+        return run()
+    except Exception as err:
+        raise HTTPException(500, f"Ponovno treniranje nije uspjelo: {err}")
+
+
 @app.get("/api/predictions")
 def predictions(pairs: str = ""):
     pair_list = [p.strip() for p in pairs.split(",") if p.strip()] or list(binance_history_client.PORTFOLIO_PAIRS)

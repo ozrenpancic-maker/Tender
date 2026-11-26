@@ -101,7 +101,7 @@ def run_walk_forward(examples: list[dict], fit_fn, purge_seconds: int = 0) -> di
     return evaluate(all_true, all_probs, all_train_labels)
 
 
-def train_horizon(conn, horizon_key: str) -> dict:
+def train_horizon(conn, horizon_key: str, models_dir: Path = MODELS_DIR) -> dict:
     spec = HORIZONS[horizon_key]
     examples = build_examples(conn, horizon_key)
     result: dict = {
@@ -141,8 +141,8 @@ def train_horizon(conn, horizon_key: str) -> dict:
     X_calib, y_calib, _ = _to_xy(calib)
     production_model = _calibrate(_fit_lgbm(X_fit, y_fit), X_calib, y_calib)
 
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    model_path = MODELS_DIR / f"{horizon_key}_lgbm.joblib"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    model_path = models_dir / f"{horizon_key}_lgbm.joblib"
     joblib.dump(production_model, model_path)
     result["model_path"] = str(model_path.name)
     return result

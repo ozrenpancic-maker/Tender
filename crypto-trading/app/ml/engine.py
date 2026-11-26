@@ -32,8 +32,8 @@ AI_SCORE_BANDS = [
     (76, 100, "STRONG BUY"),
 ]
 
-_metadata_cache: dict | None = None
-_model_cache: dict[str, object] = {}
+_metadata_cache: tuple[float, dict] | None = None  # (mtime, parsed) - vidi napomenu u _load_metadata
+_model_cache: dict[str, tuple[float, object]] = {}  # horizon -> (mtime, učitan model)
 
 
 class PredictionError(Exception):
@@ -41,13 +41,17 @@ class PredictionError(Exception):
 
 
 def _load_metadata() -> dict:
+    """Keširano PO mtime-u datoteke, ne zauvijek - automatsko ponovno treniranje
+    (app/ml/retrain_scheduled.py) može promijeniti metadata.json dok server radi, pa se mora
+    primijetiti promjena bez restarta servera."""
     global _metadata_cache
-    if _metadata_cache is None:
-        path = MODELS_DIR / "metadata.json"
-        if not path.exists():
-            raise PredictionError("Modeli nisu trenirani - pokreni 'python3 -m app.ml.train'.")
-        _metadata_cache = json.loads(path.read_text())
-    return _metadata_cache
+    path = MODELS_DIR / "metadata.json"
+    if not path.exists():
+        raise PredictionError("Modeli nisu trenirani - pokreni 'python3 -m app.ml.train'.")
+    mtime = path.stat().st_mtime
+    if _metadata_cache is None or _metadata_cache[0] != mtime:
+        _metadata_cache = (mtime, json.loads(path.read_text()))
+    return _metadata_cache[1]
 
 
 def is_horizon_validated(horizon: str) -> bool:
@@ -66,12 +70,16 @@ def is_horizon_validated(horizon: str) -> bool:
 
 
 def _load_model(horizon: str):
-    if horizon not in _model_cache:
-        path = MODELS_DIR / f"{horizon}_lgbm.joblib"
-        if not path.exists():
-            raise PredictionError(f"Nema spremljenog modela za horizont '{horizon}'.")
-        _model_cache[horizon] = joblib.load(path)
-    return _model_cache[horizon]
+    """Keširano PO mtime-u datoteke - vidi napomenu u _load_metadata. Bez ovoga bi promovirani
+    model nakon automatskog ponovnog treniranja ostao nevidljiv dok se server ručno ne restarta."""
+    path = MODELS_DIR / f"{horizon}_lgbm.joblib"
+    if not path.exists():
+        raise PredictionError(f"Nema spremljenog modela za horizont '{horizon}'.")
+    mtime = path.stat().st_mtime
+    cached = _model_cache.get(horizon)
+    if cached is None or cached[0] != mtime:
+        _model_cache[horizon] = (mtime, joblib.load(path))
+    return _model_cache[horizon][1]
 
 
 def _ai_score(probs: dict[str, float]) -> int:

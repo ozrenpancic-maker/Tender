@@ -73,6 +73,21 @@
       </thead>
       <tbody></tbody>
     </table>
+    <details class="info-toggle" style="margin-top:12px">
+      <summary>Automatsko ponovno treniranje</summary>
+      <p class="muted">
+        Periodično (tjedno, preko Windows Task Schedulera - vidi README "Automatsko ponovno
+        treniranje") sinkronizira nove povijesne podatke i ponovno trenira svaki horizont. Novi
+        model zamjenjuje stari SAMO ako na walk-forward testu nije gori - inače se zadržava stari,
+        bez tihog pogoršanja. Svaka odluka se bilježi ispod.
+      </p>
+      <button class="secondary" id="retrainNowBtn">Pokreni ponovno treniranje sad (traje do par minuta)</button>
+      <div id="retrainStatus" class="muted" style="margin-top:8px"></div>
+      <table id="retrainLogTable" style="display:none; margin-top:12px">
+        <thead><tr><th>Kad</th><th>Horizont</th><th>Odluka</th><th>Razlog</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </details>
   </section>
 
   <section data-tab="pregled">
