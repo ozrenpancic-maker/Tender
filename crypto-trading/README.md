@@ -1019,6 +1019,61 @@ poštene procjene, razdvojeno na ono što je utemeljeno i što nije:
 - nije dodano ovom prilikom (nizak prioritet, prvenstveno koristnije za kvalitetu izvršenja unutar
   dana nego kao samostalan dnevni signal), ali ostaje kandidat za budućnost.
 
+## Konkretan "bot pravilnik" (korisnik je podijelio detaljan "Copilot" skup pravila) - testirano
+
+Korisnik je podijelio puno konkretniji nacrt bota (4h trend/15m ulaz, EMA50/200, RSI pullback zona
+40-60, volumen filter, ATR stop ×1,5, R:R 1:3, rizik 0,5%/trgovina, max 3 uzastopna gubitka, max 3%
+dnevni pad, zabrana Martingalea/mijenjanja stopa/trgovanja oko FED-CPI objava) i tražio da se to
+stvarno izgradi i provjeri.
+
+**Što NIJE izvedivo i zašto:**
+- **SHORT strana** - cijeli projekt je namjerno spot long-only, bez poluge/shortanja (vidi
+  "Ograničenja koja treba znati"). Testirana je SAMO long strana.
+- **Zabrana trgovanja oko FED/CPI objava** - trebao bi ekonomski kalendar s točnim datumima objava
+  (FRED daje same vrijednosti podataka, ne raspored budućih objava) - nemamo takav izvor, nije
+  dodano. Ostale zabrane (Martingale, povećanje poluge nakon gubitka, micanje stopa) su već
+  automatski poštovane jer ih sustav strukturno ne dopušta.
+
+**Što JEST izgrađeno i pošteno testirano** (`app/backtest.py` prošireno):
+- `atr_stop_mult`/`atr_period`: stop = entry - ATR×multiplikator (umjesto fiksnog %), računat
+  jednom na ulasku iz ograničenog nedavnog prozora svijeća (ne cijela rastuća povijest - izbjegava
+  poznati O(n²) problem).
+- `take_profit_r_multiple`: izlaz kad next_candle.high dosegne entry + (entry-stop)×multiplikator.
+- `max_consecutive_losses`/`max_daily_drawdown_pct`: pauzira NOVE ulaske (postojeće pozicije i
+  dalje poštuju stop/TP) do sljedećeg kalendarskog dana (UTC).
+- Rezultat sad uključuje `profit_factor` i `avg_r_multiple` - točno mjere koje korisnikov savjet
+  traži da se prate.
+
+**VAŽAN NALAZ (pravi bug uhvaćen prije isporuke, ne spekulacija)**: prva verzija veličine pozicije
+prema riziku (`risk_pct / stop_distance_pct`) je **ignorirala trošak naknade+slippagea** pri
+računanju koliko uložiti. Na 15-minutnim BTC/ETH svijećama, ATR×1,5 stop je uzak (0,3-0,9% cijene) -
+MANJI ili usporediv s cijenom punog kruga trgovine (~1% - 2×0,4% naknada + 2×0,1% slippage). Sustav
+je zato ulagao OGROMAN dio kapitala (do 100%) baš kad je stop uzak (da "sačuva" 0,5% rizika), a
+naknada se naplaćuje na CIJELI uloženi iznos bez obzira na širinu stopa - stvaran gubitak po
+pogođenom stopu je ispao 2-3× veći od namjeravanog (prosj. R -3,67 umjesto očekivanog ~-1). PRIJE
+isporuke ovo je ispravljeno: nazivnik formule sad uključuje procijenjen trošak punog kruga
+(`2×(FEE+SLIPPAGE)`) - `fraction = risk_pct / (stop_distance_pct + trošak_punog_kruga)`. Nakon
+popravka, prosj. R po trgovini je ~-0,7 do -0,8, kako i treba biti za stop koji se stvarno pogodi.
+Ovaj popravak utječe na SVE buduće korištenje `risk_pct` (ne samo ovaj bot), ali je neznatan za
+široke dnevne stopove (5-15%) iz prijašnjeg odjeljka - brojevi ondje ostaju praktički isti.
+
+**Pošten rezultat nakon popravka** (90 dana, 15-min svijeće, $1000 start, ograničeno dostupnom
+5-min poviješću od ~113 dana - kraći uzorak nego inače):
+
+| Par | Trgovina | Win rate | Profit factor | Prosj. R | Završni saldo | Buy&hold |
+|---|---|---|---|---|---|---|
+| BTC/USDT | 62 (50 stop, 11 TP) | 6,5% | 0,016 | -0,76 | $789 | $767 |
+| ETH/USDT | 57 (44 stop, 13 TP) | 19,3% | 0,083 | -0,67 | $827 | $677 |
+
+Korisnikov VLASTITI savjet kaže da je cilj win rate 40-60% i profit factor >1,5 - ovaj konkretan
+nacrt, OVAKO operacionaliziran, promašuje oba cilja daleko (win rate 6,5-19,3%, profit factor
+0,02-0,08). Najvjerojatniji razlog: ATR×1,5 stop na 15-minutnim svijećama (0,3-0,9% cijene) je
+preuzak za normalan šum BTC/ETH na tom vremenskom okviru - 77-81% trgovina završava na stop-lossu,
+što upućuje da stop puca na obično komešanje, ne na stvaran obrat trenda. Ni ovaj nalaz ne treba
+uzeti kao konačan - korisnikov vlastiti savjet kaže da se strategija smatra testiranom tek nakon
+500-1000 trgovina, a ovdje ih imamo 57-62 (iako je profit factor toliko loš, 0,02-0,08, da je teško
+zamisliti da bi se preokrenuo s više podataka).
+
 ## Kako analizirati rezultate dugoročne uživo simulacije
 
 Korisnik je pokrenuo paralelno niz paper trading / auto-trader / whale-mirror runova (25.11.2026.)

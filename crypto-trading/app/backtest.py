@@ -2,6 +2,7 @@
 jednog dana zakašnjenja. To je ista konvencija vremena izvršenja kao u priloženom baznom testu."""
 from app.candles import Candle, load_candles
 from app.costs import COST_SCENARIOS, buy_fill_price, sell_fill_price, FEE, SLIPPAGE
+from app.indicators import atr as _atr
 from app.macro_store import load_series
 from app.strategies import GENERIC_STRATEGIES
 from app.strategies.base import StrategyContext
@@ -20,6 +21,11 @@ def run_generic_backtest(
     slippage: float = SLIPPAGE,
     stop_loss_pct: float | None = None,
     risk_pct: float | None = None,
+    atr_stop_mult: float | None = None,
+    atr_period: int = 14,
+    take_profit_r_multiple: float | None = None,
+    max_consecutive_losses: int | None = None,
+    max_daily_drawdown_pct: float | None = None,
 ) -> dict:
     """`candles` može sadržavati dodatne "zagrijavajuće" svijeće PRIJE `start_ts` (da indikatori s
     dugim lookbackom, npr. SMA200, imaju povijest od prvog dana traženog razdoblja, ne tek nakon
@@ -38,11 +44,26 @@ def run_generic_backtest(
       ako next_candle.low padne na/ispod entry*(1-stop_loss_pct) - provjerava se SVAKU svijeću dok
       je pozicija otvorena (ne samo na danima kad decide() nešto odluči), isto kao pravi stop-loss
       nalog na burzi koji je uvijek aktivan.
-    - `risk_pct` UZ `stop_loss_pct`: veličina pozicije = `risk_pct / stop_loss_pct` udjela
-      raspoložive gotovine (npr. risk 1% / stop 8% = ulaže se 12.5% gotovine po trgovini) - tako da
-      MAKSIMALNI gubitak po trgovini (ako stop-loss okine) bude otprilike `risk_pct` ukupnog
-      kapitala, bez obzira na širinu stopa. Ostatak gotovine ostaje neuložen (idle) do sljedeće
-      prilike. Bez `stop_loss_pct`, `risk_pct` se ignorira (nema smisla bez definiranog stopa)."""
+    - `risk_pct` UZ `stop_loss_pct` (ili `atr_stop_mult`): veličina pozicije tako da MAKSIMALNI
+      gubitak po trgovini (ako stop-loss okine) bude otprilike `risk_pct` ukupnog kapitala, bez
+      obzira na širinu stopa. Ostatak gotovine ostaje neuložen (idle) do sljedeće prilike.
+
+    Dodano nakon konkretnog "bot pravilnika" koji je korisnik podijelio (ATR stop, R:R take-profit,
+    zaštita računa) - SVE opcionalno, zadano None = ništa se ne mijenja za postojeće pozive:
+    - `atr_stop_mult`/`atr_period`: stop = entry - ATR(`atr_period`)*`atr_stop_mult`, računat JEDNOM
+      na ulasku (bounded prozor svijeća prije ulaska, ne cijela rastuća povijest - izbjegava isti
+      O(n²) usporavanje nađen ranije kod stair_step_stochrsi). Ignorira se ako je `stop_loss_pct`
+      također postavljen (taj ima prednost).
+    - `take_profit_r_multiple`: izlaz kad next_candle.high dosegne entry + (entry-stop)*multiple -
+      treba definiran stop (jedan od gornja dva), inače se ignorira (nema R-jedinice bez stopa).
+    - `max_consecutive_losses`/`max_daily_drawdown_pct`: nakon N uzastopnih gubitaka ILI pada preko
+      praga unutar istog kalendarskog dana (UTC), PAUZIRA nove ulaske do sljedećeg dana - postojeće
+      otvorene pozicije i dalje poštuju stop/TP (zaštita se ne gasi), samo se ne otvaraju nove.
+
+    Rezultat sad uključuje i `profit_factor` (ukupna dobit / ukupni gubitak, None ako nema gubitaka)
+    i `avg_r_multiple` (prosjek po trgovini, samo za trgovine gdje je stop bio definiran na ulasku) -
+    standardne mjere iz savjeta koji je korisnik podijelio, za pošteno vrednovanje bilo koje
+    strategije, ne samo ove nove."""
     strategy = GENERIC_STRATEGIES[strategy_key]
     decide = strategy["decide"]
     params = {**strategy["default_params"], **params}
@@ -54,29 +75,83 @@ def run_generic_backtest(
     in_position = False
     entry_price = None
     entry_cash = starting_balance
+    stop_price_active = None
+    tp_price_active = None
     trades = 0
     winning_trades = 0
     stop_loss_exits = 0
+    take_profit_exits = 0
+    trade_pnls: list[float] = []
+    trade_r_multiples: list[float] = []
     peak = starting_balance
     max_drawdown = 0.0
     equity_curve = []
+
+    consecutive_losses = 0
+    trading_paused = False
+    current_day_key = None
+    day_start_equity = starting_balance
+
+    # Procijenjen trošak PUNOG KRUGA (kupnja+prodaja) - nađeno kao stvaran bug pri provjeri
+    # konkretnog "bot pravilnika" (vidi README): bez ovoga, risk_pct veličina pozicije ignorira
+    # naknadu/slippage pri računanju koliko uložiti. Kad je stop uzak (npr. ATR-bazirani stop na
+    # kratkim vremenskim okvirima, često <1% cijene) - uzak ili usporediv s troškom punog kruga -
+    # formula bi ulagala OGROMAN dio kapitala da "sačuva" traženi risk_pct, a naknada se naplaćuje
+    # na CIJELI uloženi iznos bez obzira na širinu stopa - stvaran gubitak po pogođenom stopu
+    # ispadne višestruko veći od namjeravanog. Uključivanje ovog troška u nazivnik to sprječava.
+    round_trip_cost_pct = 2 * (fee + slippage)
+
+    def _record_closed_trade(pnl: float) -> None:
+        nonlocal winning_trades, consecutive_losses, trading_paused
+        trade_pnls.append(pnl)
+        if stop_price_active is not None and entry_price:
+            stop_distance_pct = (entry_price - stop_price_active) / entry_price
+            risk_dollars = entry_cash * (stop_distance_pct + round_trip_cost_pct)
+            if risk_dollars > 0:
+                trade_r_multiples.append(pnl / risk_dollars)
+        if pnl > 0:
+            winning_trades += 1
+            consecutive_losses = 0
+        else:
+            consecutive_losses += 1
+            if max_consecutive_losses and consecutive_losses >= max_consecutive_losses:
+                trading_paused = True
 
     for i in range(len(candles) - 1):
         next_candle = candles[i + 1]
         recording = start_ts is None or next_candle.opened_at >= start_ts
 
-        stopped_out = False
-        if recording and in_position and stop_loss_pct:
-            stop_price = entry_price * (1 - stop_loss_pct)
-            if next_candle.low <= stop_price:
-                fill = sell_fill_price(stop_price, slippage)
-                cash += position_base * fill * (1 - fee)
-                position_base = 0.0
-                in_position = False
-                entry_price = None
+        if recording:
+            day_key = next_candle.opened_at // 86400
+            if current_day_key is None or day_key != current_day_key:
+                current_day_key = day_key
+                day_start_equity = equity_curve[-1]["equity"] if equity_curve else starting_balance
+                trading_paused = False
+
+        exited = False
+        if recording and in_position and (stop_price_active is not None or tp_price_active is not None):
+            if stop_price_active is not None and next_candle.low <= stop_price_active:
+                fill = sell_fill_price(stop_price_active, slippage)
+                proceeds = position_base * fill * (1 - fee)
+                cash += proceeds
                 trades += 1
                 stop_loss_exits += 1
-                stopped_out = True
+                _record_closed_trade(proceeds - entry_cash)
+                position_base = 0.0
+                in_position = False
+                entry_price = stop_price_active = tp_price_active = None
+                exited = True
+            elif tp_price_active is not None and next_candle.high >= tp_price_active:
+                fill = sell_fill_price(tp_price_active, slippage)
+                proceeds = position_base * fill * (1 - fee)
+                cash += proceeds
+                trades += 1
+                take_profit_exits += 1
+                _record_closed_trade(proceeds - entry_cash)
+                position_base = 0.0
+                in_position = False
+                entry_price = stop_price_active = tp_price_active = None
+                exited = True
 
         ctx = StrategyContext(
             candles=candles, index=i, in_position=in_position if recording else False, params=params, aux=aux, series=series
@@ -85,26 +160,45 @@ def run_generic_backtest(
         if not recording:
             continue  # zagrijavanje: indikatori se pune, ali se ništa stvarno ne trguje/broji
 
-        if not stopped_out:
-            if decision == "buy" and not in_position:
+        if not exited:
+            if decision == "buy" and not in_position and not trading_paused:
                 fill = buy_fill_price(next_candle.open, slippage)
-                fraction = min(1.0, risk_pct / stop_loss_pct) if (risk_pct and stop_loss_pct) else 1.0
+
+                stop_price = None
+                if stop_loss_pct:
+                    stop_price = fill * (1 - stop_loss_pct)
+                elif atr_stop_mult:
+                    recent = candles[max(0, i - atr_period - 5): i + 1]
+                    a = _atr(recent, atr_period)
+                    if a:
+                        stop_price = fill - a * atr_stop_mult
+
+                fraction = 1.0
+                if risk_pct and stop_price is not None and stop_price < fill:
+                    stop_distance_pct = (fill - stop_price) / fill
+                    fraction = min(1.0, risk_pct / (stop_distance_pct + round_trip_cost_pct))
+
                 invest_amount = cash * fraction
                 position_base = (invest_amount * (1 - fee)) / fill
                 entry_cash = invest_amount
                 entry_price = fill
+                stop_price_active = stop_price
+                tp_price_active = (
+                    fill + (fill - stop_price) * take_profit_r_multiple
+                    if (take_profit_r_multiple and stop_price is not None and stop_price < fill)
+                    else None
+                )
                 cash -= invest_amount
                 in_position = True
             elif decision == "sell" and in_position:
                 fill = sell_fill_price(next_candle.open, slippage)
                 proceeds = position_base * fill * (1 - fee)
                 cash += proceeds
+                trades += 1
+                _record_closed_trade(proceeds - entry_cash)
                 position_base = 0.0
                 in_position = False
-                entry_price = None
-                trades += 1
-                if proceeds > entry_cash:
-                    winning_trades += 1
+                entry_price = stop_price_active = tp_price_active = None
 
         # Equity = STVARNA gotovina da bi se pozicija likvidirala SADA (sell_fill_price + FEE), ne
         # sirova mark-to-market cijena - nađeno u ChatGPT-ovoj neovisnoj reviziji: bez ovoga
@@ -116,7 +210,16 @@ def run_generic_backtest(
         max_drawdown = max(max_drawdown, 1 - equity / peak if peak > 0 else 0)
         equity_curve.append({"at": next_candle.opened_at, "equity": round(equity, 4)})
 
+        if recording and max_daily_drawdown_pct and day_start_equity > 0:
+            if 1 - equity / day_start_equity >= max_daily_drawdown_pct:
+                trading_paused = True
+
     final_equity = equity_curve[-1]["equity"] if equity_curve else starting_balance
+
+    gross_profit = sum(p for p in trade_pnls if p > 0)
+    gross_loss = -sum(p for p in trade_pnls if p < 0)
+    profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else None
+    avg_r_multiple = (sum(trade_r_multiples) / len(trade_r_multiples)) if trade_r_multiples else None
 
     return {
         "strategy": strategy_key,
@@ -124,6 +227,9 @@ def run_generic_backtest(
         "trades": trades,
         "winning_trades": winning_trades,
         "stop_loss_exits": stop_loss_exits,
+        "take_profit_exits": take_profit_exits,
+        "profit_factor": round(profit_factor, 3) if profit_factor is not None else None,
+        "avg_r_multiple": round(avg_r_multiple, 3) if avg_r_multiple is not None else None,
         "starting_balance": starting_balance,
         "final_balance": round(final_equity, 2),
         "max_drawdown_pct": round(max_drawdown * 100, 2),
@@ -174,6 +280,11 @@ def run_backtest(
     slippage: float = SLIPPAGE,
     stop_loss_pct: float | None = None,
     risk_pct: float | None = None,
+    atr_stop_mult: float | None = None,
+    atr_period: int = 14,
+    take_profit_r_multiple: float | None = None,
+    max_consecutive_losses: int | None = None,
+    max_daily_drawdown_pct: float | None = None,
 ) -> dict:
     if strategy_key == "buy_hold":
         candles = load_candles(conn, "binance", pair, interval_min, start_ts, end_ts)
@@ -223,7 +334,8 @@ def run_backtest(
         series[spec["series_id"]] = points
 
     return run_generic_backtest(
-        candles, strategy_key, params, starting_balance, aux, series, start_ts, fee, slippage, stop_loss_pct, risk_pct
+        candles, strategy_key, params, starting_balance, aux, series, start_ts, fee, slippage, stop_loss_pct, risk_pct,
+        atr_stop_mult, atr_period, take_profit_r_multiple, max_consecutive_losses, max_daily_drawdown_pct,
     )
 
 
