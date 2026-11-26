@@ -153,6 +153,66 @@ def backtest_cost_sensitivity(req: BacktestRequest):
         conn.close()
 
 
+# ---------- Portfelj trend strategija (više coinova, veličina po volatilnosti) ----------
+
+class PortfolioBacktestRequest(BaseModel):
+    pairs: list[str] | None = None  # None = DEFAULT_PAIRS
+    strategies: list[str] | None = None  # None = DEFAULT_STRATEGIES
+    start_date: str
+    end_date: str
+    starting_balance: float = 1000.0
+    target_vol: float | None = None  # npr. 0.3 = ciljana godišnja volatilnost portfelja 30%
+    rebalance_drift: float = 1.0
+
+
+@app.get("/api/portfolio-backtest/defaults")
+def portfolio_backtest_defaults():
+    from app.portfolio_backtest import DEFAULT_PAIRS, DEFAULT_STRATEGIES
+
+    return {"pairs": DEFAULT_PAIRS, "strategies": DEFAULT_STRATEGIES}
+
+
+@app.post("/api/portfolio-backtest")
+def portfolio_backtest(req: PortfolioBacktestRequest):
+    from app.portfolio_backtest import (
+        DEFAULT_PAIRS, DEFAULT_STRATEGIES, load_portfolio_candles, run_equal_weight_buy_hold, run_portfolio_backtest,
+    )
+
+    pairs = req.pairs or DEFAULT_PAIRS
+    strategies = req.strategies or DEFAULT_STRATEGIES
+    unknown = [s for s in strategies if s not in GENERIC_STRATEGIES]
+    if unknown:
+        raise HTTPException(400, f"Nepoznate strategije: {', '.join(unknown)}")
+    needs_extra = [s for s in strategies if GENERIC_STRATEGIES[s].get("needs_aux") or GENERIC_STRATEGIES[s].get("needs_series")]
+    if needs_extra:
+        raise HTTPException(400, f"Portfelj podržava samo čisto cjenovne strategije, ne: {', '.join(needs_extra)}")
+    if not 1 <= len(pairs) <= 10:
+        raise HTTPException(400, "Odaberi 1 do 10 parova.")
+    if req.target_vol is not None and not 0.05 <= req.target_vol <= 3:
+        raise HTTPException(400, "target_vol mora biti između 0.05 i 3 (5% - 300% godišnje).")
+    if req.starting_balance <= 0 or req.rebalance_drift <= 0:
+        raise HTTPException(400, "starting_balance i rebalance_drift moraju biti pozitivni.")
+    try:
+        start_ts, end_ts = _to_ts(req.start_date), _to_ts(req.end_date)
+    except ValueError as err:
+        raise HTTPException(400, f"Neispravan datum: {err}")
+    if end_ts <= start_ts:
+        raise HTTPException(400, "Završni datum mora biti nakon početnog.")
+
+    conn = db.get_connection()
+    try:
+        cbp = load_portfolio_candles(conn, pairs, start_ts, end_ts)
+        portfolio = run_portfolio_backtest(
+            cbp, strategies, req.starting_balance, start_ts, target_vol=req.target_vol, rebalance_drift=req.rebalance_drift,
+        )
+        buy_hold = run_equal_weight_buy_hold(cbp, req.starting_balance, start_ts)
+        return {"portfolio": portfolio, "buy_hold": buy_hold}
+    except ValueError as err:
+        raise HTTPException(400, str(err))
+    finally:
+        conn.close()
+
+
 # ---------- Optimizacija (in-sample / out-of-sample) ----------
 
 class OptimizeRequest(BaseModel):

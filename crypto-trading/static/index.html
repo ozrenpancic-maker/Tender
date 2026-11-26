@@ -330,6 +330,69 @@
     </table>
   </section>
 
+  <section data-tab="analiza">
+    <h2>12. Portfelj trend strategija (više coinova, veličina po volatilnosti)</h2>
+    <details class="info-toggle">
+      <summary>Što ovo znači</summary>
+      <p class="muted">
+        Umjesto jedne strategije na jednom coinu: 3 trend strategije (EMA trend, Trend guard, Vol-guarded trend)
+        glasaju na svakom coinu, a novac se dijeli prema <strong>inverznoj volatilnosti</strong> (mirniji coin dobije
+        veću poziciju, divlji manju). Bez poluge, odluka nakon zatvaranja dana, izvršenje na otvaranju sljedećeg,
+        naknade i slippage uračunati. Ovako otprilike rade profesionalni trend fondovi (CTA).
+        <strong>Očekuj manje spektakularne, ali stabilnije rezultate</strong>: na 2021-04 → 2025-11 (razdoblje koje
+        NIJE korišteno za odabir strategija) Sharpe 0,98 naspram 0,71 za buy&amp;hold, maks. pad 38% naspram 89%,
+        ali i godine gotovo bez zarade (2025: +0,1%). Samo 4 velika, jako korelirana coina - diverzifikacija je
+        ograničena. Prošli rezultati nisu jamstvo budućih.
+      </p>
+    </details>
+    <div class="row">
+      <div class="field">
+        <label>Parovi (zarezom, trebaju dnevnu Binance povijest)</label>
+        <input id="pfPairs" value="BTC/USDT,ETH/USDT,SOL/USDT,XRP/USDT" style="width:280px" />
+      </div>
+      <div class="field">
+        <label>Od</label>
+        <input type="date" id="pfStart" value="2021-04-01" />
+      </div>
+      <div class="field">
+        <label>Do</label>
+        <input type="date" id="pfEnd" value="2026-11-22" />
+      </div>
+      <div class="field">
+        <label>Početna sredstva ($)</label>
+        <input type="number" id="pfBalance" value="1000" min="1" />
+      </div>
+      <div class="field">
+        <label>Ciljana volatilnost portfelja</label>
+        <select id="pfTargetVol">
+          <option value="">Bez (veći povrat, veći pad)</option>
+          <option value="0.5">50% godišnje</option>
+          <option value="0.3">30% godišnje (manji pad, manji povrat)</option>
+        </select>
+      </div>
+      <button id="pfRun">Pokreni portfelj</button>
+    </div>
+    <p id="pfStatus" class="muted" style="display:none"></p>
+    <div class="table-scroll">
+      <table id="pfTable" style="display:none">
+        <thead>
+          <tr><th></th><th>Završni saldo</th><th>CAGR</th><th>Volatilnost</th><th>Sharpe</th><th>Max. pad</th><th>Calmar</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p id="pfDetails" class="muted"></p>
+    <div class="table-scroll">
+      <table id="pfYearTable" style="display:none">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="pfChart" width="920" height="260"></canvas>
+    </div>
+  </section>
+
   <section data-tab="podaci">
     <h2>8. Coinbase veza</h2>
     <details class="info-toggle">

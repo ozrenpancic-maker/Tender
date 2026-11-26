@@ -315,6 +315,115 @@ function renderBacktestChart(results) {
   }
 }
 
+// ---------- Portfelj trend strategija ----------
+
+function fmtUsd(n) {
+  return `$${Number(n).toLocaleString("hr-HR", { maximumFractionDigits: 2 })}`;
+}
+
+function fmtMaybe(n, suffix = "") {
+  return n === null || n === undefined ? "—" : `${Number(n).toLocaleString("hr-HR", { maximumFractionDigits: 2 })}${suffix}`;
+}
+
+function renderPortfolioChart(series) {
+  // Logaritamska skala: buy&hold ima -89% pa +300% - na linearnoj skali portfelj izgleda kao ravna crta.
+  const canvas = document.getElementById("pfChart");
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const all = series.flatMap((s) => s.curve).filter((p) => p.equity > 0);
+  if (!all.length) return;
+  const minAt = Math.min(...all.map((p) => p.at));
+  const maxAt = Math.max(...all.map((p) => p.at));
+  const minEq = Math.log(Math.min(...all.map((p) => p.equity)));
+  const maxEq = Math.log(Math.max(...all.map((p) => p.equity)));
+  const pad = 30;
+  const w = canvas.width - pad * 2;
+  const h = canvas.height - pad * 2;
+  const x = (at) => pad + ((at - minAt) / (maxAt - minAt || 1)) * w;
+  const y = (eq) => pad + h - ((Math.log(eq) - minEq) / (maxEq - minEq || 1)) * h;
+
+  ctx.strokeStyle = "#e2e8f0";
+  ctx.strokeRect(pad, pad, w, h);
+  for (const s of series) {
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    s.curve.filter((p) => p.equity > 0).forEach((p, i) => {
+      if (i === 0) ctx.moveTo(x(p.at), y(p.equity));
+      else ctx.lineTo(x(p.at), y(p.equity));
+    });
+    ctx.stroke();
+  }
+  let legendX = pad;
+  ctx.font = "11px sans-serif";
+  for (const s of series) {
+    ctx.fillStyle = s.color;
+    ctx.fillRect(legendX, 6, 10, 10);
+    ctx.fillStyle = "#334155";
+    ctx.fillText(s.label, legendX + 14, 15);
+    legendX += ctx.measureText(s.label).width + 36;
+  }
+  ctx.fillStyle = "#64748b";
+  ctx.fillText("logaritamska skala", canvas.width - pad - 100, canvas.height - 8);
+}
+
+document.getElementById("pfRun").addEventListener("click", async () => {
+  const status = document.getElementById("pfStatus");
+  const table = document.getElementById("pfTable");
+  const yearTable = document.getElementById("pfYearTable");
+  status.style.display = "block";
+  status.textContent = "Računam portfelj (može potrajati nekoliko sekundi)…";
+  const tv = document.getElementById("pfTargetVol").value;
+  const balance = Number(document.getElementById("pfBalance").value);
+  try {
+    const r = await api("/api/portfolio-backtest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pairs: document.getElementById("pfPairs").value.split(",").map((p) => p.trim()).filter(Boolean),
+        start_date: document.getElementById("pfStart").value,
+        end_date: document.getElementById("pfEnd").value,
+        starting_balance: balance,
+        target_vol: tv ? Number(tv) : null,
+      }),
+    });
+    const pf = r.portfolio;
+    const bh = r.buy_hold;
+    const tbody = table.querySelector("tbody");
+    tbody.innerHTML = "";
+    for (const [label, m] of [["Portfelj trend strategija", pf], ["Buy & hold (jednake težine)", bh]]) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${label}</td><td>${fmtUsd(m.final_balance)}</td><td>${fmtMaybe(m.cagr_pct, "%")}</td>
+        <td>${fmtMaybe(m.annual_vol_pct, "%")}</td><td>${fmtMaybe(m.sharpe)}</td>
+        <td>${fmtMaybe(m.max_drawdown_pct, "%")}</td><td>${fmtMaybe(m.calmar)}</td>`;
+      tbody.appendChild(tr);
+    }
+    table.style.display = "table";
+
+    document.getElementById("pfDetails").textContent =
+      `Parovi: ${pf.pairs.join(", ")} · strategije: ${pf.strategies.join(", ")} · trgovina: ${pf.trades} · ` +
+      `naknade+slippage: ${fmtUsd(pf.fees_paid)} (${fmtMaybe(pf.fees_pct_of_avg_equity_per_year, "%")} prosj. kapitala godišnje) · ` +
+      `prosječna izloženost: ${fmtMaybe(pf.avg_exposure_pct, "%")} (ostatak u gotovini).`;
+
+    const years = Object.keys(pf.yearly_return_pct || {});
+    yearTable.querySelector("thead").innerHTML = `<tr><th>Godina</th>${years.map((y) => `<th>${y}</th>`).join("")}</tr>`;
+    yearTable.querySelector("tbody").innerHTML = [["Portfelj", pf], ["Buy & hold", bh]]
+      .map(([label, m]) => `<tr><td>${label}</td>${years.map((y) => `<td>${fmtMaybe((m.yearly_return_pct || {})[y], "%")}</td>`).join("")}</tr>`)
+      .join("");
+    yearTable.style.display = years.length ? "table" : "none";
+
+    renderPortfolioChart([
+      { label: "Portfelj", color: "#2f5fdb", curve: pf.equity_curve },
+      { label: "Buy & hold", color: "#64748b", curve: bh.equity_curve },
+    ]);
+    status.textContent = "Gotovo. Godišnji povrati: prva/zadnja godina su djelomične.";
+  } catch (err) {
+    status.textContent = "Greška: " + err.message;
+    table.style.display = "none";
+    yearTable.style.display = "none";
+  }
+});
+
 // ---------- Wall Street / equity ----------
 
 document.getElementById("eqTest").addEventListener("click", async () => {

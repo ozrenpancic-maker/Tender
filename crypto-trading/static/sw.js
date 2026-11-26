@@ -1,6 +1,6 @@
 // Minimalni service worker - omogućuje instalaciju kao PWA i brzo učitavanje ljuske aplikacije.
 // /api/ pozivi NIKAD se ne keširaju - podaci o cijenama/trgovanju moraju uvijek biti živi.
-const CACHE_NAME = "kripto-mvp-shell-v1";
+const CACHE_NAME = "kripto-mvp-shell-v2";
 const SHELL_ASSETS = [
   "/",
   "/styles.css",

@@ -547,7 +547,12 @@ put stvarno POTVRĐENO da se projekt kompajlira i pakira u instalabilan APK.
   svijeću, provjerava da se prošla odluka ne mijenja, za SVE registrirane strategije), aritmetika
   naknada/slippagea, OHLC integritet podataka (duplikati, nemogući odnosi). Pokreni
   `python3 -m app.checks` nakon svake nove/izmijenjene strategije. Vidi "Nezavisna provjera s
-  ChatGPT-ovim paralelnim istraživanjem" iznad.
+  ChatGPT-ovim paralelnim istraživanjem" iznad. Od portfelja nadalje provjerava i sloj odluka
+  portfelja (`check_portfolio_no_lookahead`).
+- **`app/portfolio_backtest.py`** — portfelj trend strategija preko više coinova (ansambl 3
+  strategije, veličina po inverznoj volatilnosti, opcionalno ciljanje volatilnosti). Odluke
+  (`compute_target_weights`) odvojene od izvršenja zbog provjere look-aheada. Vidi "Portfelj trend
+  strategija" ispod.
 - **`app/coinbase_client.py`** — ISKLJUČIVO javni cjenovni feed (bez ključa). Autenticirani dio je
   uklonjen (KriptoMVP 4.4 pravila) - vidi "Isključivo savjetnik/simulator" ispod.
 - **`app/ml/`** — AI Prediction Engine (faza 3): `features.py` (značajke), `labels.py` (3-klasni
@@ -1144,6 +1149,83 @@ backtesta (samoobmana, biranje "pobjednika" prerano):
 4. **Nakon dovoljno podataka**: usporedi sve runove jedni s drugima (isti format kao "Koja
    strategija je stvarno najbolja" test), zadrži ono što pokaže dosljednu prednost, ugasi ostalo -
    ne nastavljaj raditi sve paralelno unedogled.
+
+## Portfelj trend strategija (`app/portfolio_backtest.py`, dashboard odjeljak 12)
+
+Odgovor na pitanje "kako to rade vrhunske firme": umjesto traženja JEDNE pobjedničke strategije na
+JEDNOM coinu, profesionalni trend fondovi (CTA / managed futures, "time-series momentum") drže
+**portfelj** - više tržišta, više signala, veličina pozicije prema riziku. Ovo je ta ideja,
+iskreno testirana na našim podacima.
+
+### Kako radi
+
+1. Tri trend strategije koje su u ranijem 365-dnevnom testu rangiranja bile najbolje (`ema_trend`,
+   `trend_guard`, `vol_guarded_trend`), **sa zadanim parametrima, bez ikakvog štimanja**, svaka
+   vodi svoje virtualno stanje (u poziciji / van) na svakom coinu.
+2. Signal coina = udio strategija koje su "unutra" (0, 1/3, 2/3 ili 1) - ansambl, ne jedan glas.
+3. Rizik se dijeli prema **inverznoj volatilnosti** (30-dnevna realizirana): SOL dobije manju
+   poziciju od BTC-a jer je divljiji, pa svaki coin nosi sličan rizik.
+4. Opcionalno ciljanje volatilnosti portfelja (`target_vol`) - procjena pretpostavlja POTPUNU
+   korelaciju coinova (konzervativno).
+5. Bez poluge, ostatak u gotovini. Odluka nakon zatvaranja dana, izvršenje na otvaranju sljedećeg,
+   naknada 0,4% + slippage 0,1% po strani, kapital mjeren kao likvidacijska vrijednost.
+6. Rebalans samo kad se signal promijeni ili se težina udvostruči/prepolovi (`rebalance_drift=1.0`).
+
+### Rezultati ($1000, BTC/ETH/SOL/XRP, dnevne Binance svijeće)
+
+**Najpošteniji prozor: 2021-04 → 2025-11.** Ove tri strategije su izabrane na zadnjih 365 dana
+(2025-11 → 2026-11), pa je prozor koji ne uključuje tu godinu "kvazi out-of-sample" - podaci koji
+NISU utjecali na izbor.
+
+| 2021-04 → 2025-11 | Završno | CAGR | Volatilnost | Sharpe | Max pad |
+|---|---|---|---|---|---|
+| Buy & hold, jednake težine | $3206 | 28,5% | 83,6% | 0,71 | **89,3%** |
+| **Portfelj** (bez target_vol) | $3654 | 32,2% | 33,7% | **0,98** | 37,7% |
+| Portfelj, target_vol 50% | $3030 | 27,0% | 29,7% | 0,94 | 34,5% |
+| Portfelj, target_vol 30% | $2375 | 20,5% | 23,2% | 0,91 | 28,3% |
+| 12 pojedinačnih (strategija × coin), MEDIJAN | - | 19,1% | - | 0,62 | 61,9% |
+
+Cijelo razdoblje 2021-04 → 2026-11 (uključuje godinu izbora, pa je blago optimistično): portfelj
+$3976, Sharpe 0,92, max pad 37,7% naspram buy&hold $1774, Sharpe 0,52, max pad 89,3%.
+
+Po godinama (portfelj bez target_vol / buy&hold): 2021 +117% / +220%, **2022 −17% / −84%**,
+2023 +29% / +309%, 2024 +58% / +103%, 2025 +0,1% / −24%, 2026 (do 22.11.) +9% / −44%.
+
+### Što to znači - iskreno
+
+- **Glavna korist nije veći povrat, nego preživljavanje.** U 2022. buy&hold je izgubio 84%, portfelj
+  17%. Iz −84% treba +525% da se vratiš na nulu - zato portfelj na kraju završi iznad buy&holda
+  iako u svakoj bikovskoj godini (2021, 2023, 2024) jako zaostaje.
+- **Portfelj je bolji od tipične pojedinačne strategije** (medijan Sharpe 0,62, max pad 62%) - ali
+  NIJE bolji od najbolje pojedinačne (ema_trend na SOL-u, Sharpe 1,11). To je očekivano i u redu:
+  najbolju pojedinačnu znaš tek NAKNADNO, portfelj ne traži da pogodiš unaprijed.
+- **Duge mrtve faze**: 2025. gotovo nula. Prosječna izloženost samo ~35% (ostatak gotovina).
+  Trend sustavi tako izgledaju - dugo ništa, pa velik trend.
+- Sharpe ~0,9-1,0 je u rangu onoga što stvarni CTA fondovi dugoročno postižu. Brojevi koji obećavaju
+  puno više od toga gotovo su uvijek pretjerano optimizirani.
+- Troškovi: 516 trgovina u 4,6 godina, naknade+slippage $744 (~6,5% prosječnog kapitala
+  godišnje, promet ~13× godišnje) - uračunato u sve gornje brojke. To je velik trošak; uz niže
+  naknade (veći Coinbase volumen ili limit nalozi) rezultat bi bio primjetno bolji.
+
+### Ograničenja
+
+- Samo 4 velika coina, i jako su korelirani (u padovima padaju zajedno) - stvarni CTA fondovi
+  diverzificiraju preko desetaka nepovezanih tržišta (obveznice, valute, sirovine). Ovdje je
+  diverzifikacija ograničena. Dodavanje još altcoina pomaže manje nego što zvuči.
+- Strategije su izabrane na podacima iz 2025-26; čak i "kvazi out-of-sample" prozor nije pravi
+  budući test - pravi test je tek uživo trgovanje od danas nadalje (paper trading).
+- `rebalance_drift` je testiran na 4 vrijednosti (0,25/0,5/1,0/samo-signal); razlike su male
+  (Sharpe 0,94-0,98), izabrano 1,0 jer manje trgovanja, ne jer je "pobijedio".
+- Long-only spot, bez shortanja - u medvjeđem tržištu najbolje što portfelj može je biti u gotovini.
+
+### Provjera look-ahead biasa
+
+`app/checks.py:check_portfolio_no_lookahead` mijenja budućnost na svim parovima odjednom (dvije
+vrste mutacije: skaliranje cijene i promjena volatilnosti) i provjerava da su signali, procjene
+volatilnosti i težine prije reza identični. **Sama provjera je testirana namjernim bugom**: prva
+verzija je PROŠLA s procjenom volatilnosti koja gleda 5 dana unaprijed (skaliranje cijene ×3 ne
+mijenja log-povrate, a sve težine u tom razdoblju su bile 0). Popravljena verzija hvata i look-ahead
+od samo 1 dana.
 
 ## Ograničenja koja treba znati
 

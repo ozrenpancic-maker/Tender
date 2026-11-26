@@ -61,6 +61,56 @@ def check_no_lookahead(candles: list[Candle]) -> None:
     print(f"PASS check_no_lookahead: {len(GENERIC_STRATEGIES)} strategija, {CUTOFF_INDEX} indeksa svaka.")
 
 
+def _mutate_future_volatility(candles: list[Candle], from_index: int) -> list[Candle]:
+    """Kao _mutate_future, ali mijenja VOLATILNOST budućnosti (naizmjence x1.25 / x0.8 po svijeći).
+    Potrebno jer obično množenje cijelog niza s 3 ne mijenja log-povrate - procjena volatilnosti
+    koja (pogrešno) viri u budućnost to ne bi primijetila. Nađeno namjernim ubacivanjem buga: prva
+    verzija check_portfolio_no_lookahead s običnim 3x je PROŠLA s volatilnošću koja gleda 5 dana unaprijed."""
+    out = list(candles[:from_index])
+    for k, c in enumerate(candles[from_index:]):
+        f = 1.25 if k % 2 == 0 else 0.8
+        out.append(replace(c, open=c.open * f, high=c.high * f, low=c.low * f, close=c.close * f, volume=c.volume * 5))
+    return out
+
+
+def check_portfolio_no_lookahead(candles_by_pair: dict[str, list[Candle]]) -> None:
+    """Isto kao check_no_lookahead, ali za sloj odluka portfelja (app/portfolio_backtest.py):
+    signali, procjene volatilnosti i ciljne težine (s i bez ciljanja volatilnosti portfelja) na
+    datumima prije reza moraju biti identični bez obzira na promjenu budućnosti NA SVIM PAROVIMA."""
+    from app.portfolio_backtest import DEFAULT_STRATEGIES, compute_target_weights
+
+    first = next(iter(candles_by_pair.values()))
+    start_ts = first[300].opened_at
+    cutoff_ts = first[CUTOFF_INDEX].opened_at
+    nonzero_dates = 0
+    for mutate in (_mutate_future, _mutate_future_volatility):
+        mutated = {}
+        for p, cs in candles_by_pair.items():
+            cut = next(i for i, c in enumerate(cs) if c.opened_at >= cutoff_ts)
+            mutated[p] = mutate(cs, cut)
+
+        for target_vol in (None, 0.3):
+            a = compute_target_weights(candles_by_pair, DEFAULT_STRATEGIES, start_ts, target_vol)
+            b = compute_target_weights(mutated, DEFAULT_STRATEGIES, start_ts, target_vol)
+            before = [(x, y) for x, y in zip(a, b) if x[0] < cutoff_ts]
+            assert before, "check_portfolio_no_lookahead: nema datuma prije reza - test ne bi ništa provjerio."
+            for (t, w_a, s_a, v_a), (_, w_b, s_b, v_b) in before:
+                same = (
+                    s_a == s_b
+                    and v_a.keys() == v_b.keys() and all(abs(v_a[p] - v_b[p]) < 1e-12 for p in v_a)
+                    and all(abs(w_a[p] - w_b[p]) < 1e-12 for p in w_a)
+                )
+                assert same, (
+                    f"LOOK-AHEAD BUG u portfelju ({mutate.__name__}, target_vol={target_vol}): "
+                    f"odluka na {t} ovisi o budućim podacima."
+                )
+                nonzero_dates += any(w > 0 for w in w_a.values())
+    # Bez ovoga bi test mogao "proći" samo zato što su sve težine 0 u testiranom razdoblju.
+    assert nonzero_dates > 0, "check_portfolio_no_lookahead: sve težine prije reza su 0 - test težina ništa ne dokazuje."
+    print(f"PASS check_portfolio_no_lookahead: {len(candles_by_pair)} para, {len(before)} datuma prije reza, "
+          f"2 vrste mutacije budućnosti (cijena i volatilnost), s i bez ciljanja volatilnosti.")
+
+
 def check_fee_arithmetic() -> None:
     """Konstantna cijena, jedna kupnja i jedna prodaja: naknade+slippage mogu SAMO smanjiti kapital,
     nikad ga povećati ili ostaviti netaknutim.
@@ -105,6 +155,13 @@ def main() -> None:
         check_ohlc_integrity("BTC/USDT", btc)
         check_fee_arithmetic()
         check_no_lookahead(btc)
+
+        eth = load_candles(conn, "binance", "ETH/USDT", 1440, 0, 2_000_000_000)
+        cutoff_plus = btc[CUTOFF_INDEX + 30].opened_at  # skraćeno - test treba samo okolinu reza, ne cijelu povijest
+        check_portfolio_no_lookahead({
+            "BTC/USDT": [c for c in btc if c.opened_at <= cutoff_plus],
+            "ETH/USDT": [c for c in eth if c.opened_at <= cutoff_plus],
+        })
         print("SVE PROŠLO.")
     finally:
         conn.close()
