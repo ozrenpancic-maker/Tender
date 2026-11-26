@@ -1,4 +1,4 @@
-"""Etherscan - javni, dokumentirani, besplatan API (5 poziva/s na free tieru) za ETH on-chain
+"""Etherscan - javni, dokumentirani, besplatan API (3 poziva/s na free tieru - potvrđeno greškom "Max calls per sec rate limit reached (3/sec)" na korisnikovom serveru) za ETH on-chain
 podatke. Koristi se za "whale mirror" (app/whale_mirror.py): zrcali promjene stanja JAVNOG
 novčanika (balans u lančanom registru je po definiciji javan - nema privatnosti za narušiti).
 
@@ -9,6 +9,7 @@ NIJE blokiran odavde).
 NAPOMENA: ovo je Etherscan API v2 (v1 je deprecated, traži migraciju na v2 s `chainid` parametrom -
 vidi docs.etherscan.io/v2-migration). chainid=1 = Ethereum mainnet.
 """
+import threading
 import time
 
 import httpx
@@ -17,22 +18,47 @@ from app.config import ETHERSCAN_API_KEY
 
 ETHERSCAN_BASE = "https://api.etherscan.io/v2/api"
 CHAIN_ID_ETHEREUM = 1
+# Svi whale mirror runovi dijele JEDAN ključ (limit 3/s po ključu). Kad se server pokrene, svi
+# runovi krenu istovremeno i bez ovoga premaše limit (vidjeno uživo: "run 5/9: rate limit reached").
+# Globalni razmak između poziva: 0.4 s = 2.5 poziva/s, sigurno ispod limita.
+MIN_INTERVAL_SECONDS = 0.4
+RATE_LIMIT_RETRIES = 2
+_throttle_lock = threading.Lock()
+_last_call_at = 0.0
 
 
 class EtherscanError(Exception):
     pass
 
 
+def _throttle() -> None:
+    global _last_call_at
+    with _throttle_lock:
+        wait = _last_call_at + MIN_INTERVAL_SECONDS - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        _last_call_at = time.monotonic()
+
+
+def _is_rate_limited(data: dict) -> bool:
+    return "rate limit" in str(data.get("result", "")).lower()
+
+
 def _get(params: dict) -> dict:
     if not ETHERSCAN_API_KEY:
         raise EtherscanError("ETHERSCAN_API_KEY nije postavljen u .env (besplatna registracija: etherscan.io/apis).")
     params = {**params, "chainid": CHAIN_ID_ETHEREUM, "apikey": ETHERSCAN_API_KEY}
-    try:
-        resp = httpx.get(ETHERSCAN_BASE, params=params, timeout=15)
-        resp.raise_for_status()
-    except httpx.HTTPError as err:
-        raise EtherscanError(f"Etherscan zahtjev nije uspio: {err}") from err
-    data = resp.json()
+    for attempt in range(RATE_LIMIT_RETRIES + 1):
+        _throttle()
+        try:
+            resp = httpx.get(ETHERSCAN_BASE, params=params, timeout=15)
+            resp.raise_for_status()
+        except httpx.HTTPError as err:
+            raise EtherscanError(f"Etherscan zahtjev nije uspio: {err}") from err
+        data = resp.json()
+        if not _is_rate_limited(data) or attempt == RATE_LIMIT_RETRIES:
+            break
+        time.sleep(1.0 + attempt)  # limit se resetira svake sekunde
     if data.get("status") != "1":
         message = data.get("message", "nepoznata greška")
         result = data.get("result", "")
