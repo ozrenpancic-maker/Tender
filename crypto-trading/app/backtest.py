@@ -18,6 +18,8 @@ def run_generic_backtest(
     start_ts: int | None = None,
     fee: float = FEE,
     slippage: float = SLIPPAGE,
+    stop_loss_pct: float | None = None,
+    risk_pct: float | None = None,
 ) -> dict:
     """`candles` može sadržavati dodatne "zagrijavajuće" svijeće PRIJE `start_ts` (da indikatori s
     dugim lookbackom, npr. SMA200, imaju povijest od prvog dana traženog razdoblja, ne tek nakon
@@ -25,7 +27,22 @@ def run_generic_backtest(
     zagrijavaju), ali se trgovine stvarno izvršavaju i equity_curve/trades broje samo od `start_ts`
     nadalje - portfelj kreće ravno (bez pozicije) na `start_ts`, isto kao u priloženom ChatGPT-ovom
     paralelnom istraživanju (`backtest_51.py`), radi usporedivosti i da zagrijavanje ne "izmisli"
-    trgovine koje korisnik nije tražio."""
+    trgovine koje korisnik nije tražio.
+
+    `stop_loss_pct`/`risk_pct` (OBOJE opcionalni, zadano None = STAROM ponašanju, ništa se ne
+    mijenja za postojeće pozive): dodano nakon što je korisnik pitao da provjerimo opću "pametnu"
+    tvrdnju da je upravljanje rizikom (stop-loss + veličina pozicije prema riziku) važnije od
+    "magičnog indikatora" - svih 16 strategija dosad nije imalo NIKAKAV stop-loss, čist izlaz samo
+    na signal strategije. Ovo to popravlja kao TESTABILNU opciju, ne pretpostavku:
+    - `stop_loss_pct` sam (bez risk_pct): postojeće "sve ili ništa" ulaganje, ali s tvrdim izlazom
+      ako next_candle.low padne na/ispod entry*(1-stop_loss_pct) - provjerava se SVAKU svijeću dok
+      je pozicija otvorena (ne samo na danima kad decide() nešto odluči), isto kao pravi stop-loss
+      nalog na burzi koji je uvijek aktivan.
+    - `risk_pct` UZ `stop_loss_pct`: veličina pozicije = `risk_pct / stop_loss_pct` udjela
+      raspoložive gotovine (npr. risk 1% / stop 8% = ulaže se 12.5% gotovine po trgovini) - tako da
+      MAKSIMALNI gubitak po trgovini (ako stop-loss okine) bude otprilike `risk_pct` ukupnog
+      kapitala, bez obzira na širinu stopa. Ostatak gotovine ostaje neuložen (idle) do sljedeće
+      prilike. Bez `stop_loss_pct`, `risk_pct` se ignorira (nema smisla bez definiranog stopa)."""
     strategy = GENERIC_STRATEGIES[strategy_key]
     decide = strategy["decide"]
     params = {**strategy["default_params"], **params}
@@ -35,9 +52,11 @@ def run_generic_backtest(
     cash = starting_balance
     position_base = 0.0
     in_position = False
+    entry_price = None
     entry_cash = starting_balance
     trades = 0
     winning_trades = 0
+    stop_loss_exits = 0
     peak = starting_balance
     max_drawdown = 0.0
     equity_curve = []
@@ -46,6 +65,19 @@ def run_generic_backtest(
         next_candle = candles[i + 1]
         recording = start_ts is None or next_candle.opened_at >= start_ts
 
+        stopped_out = False
+        if recording and in_position and stop_loss_pct:
+            stop_price = entry_price * (1 - stop_loss_pct)
+            if next_candle.low <= stop_price:
+                fill = sell_fill_price(stop_price, slippage)
+                cash += position_base * fill * (1 - fee)
+                position_base = 0.0
+                in_position = False
+                entry_price = None
+                trades += 1
+                stop_loss_exits += 1
+                stopped_out = True
+
         ctx = StrategyContext(
             candles=candles, index=i, in_position=in_position if recording else False, params=params, aux=aux, series=series
         )
@@ -53,20 +85,26 @@ def run_generic_backtest(
         if not recording:
             continue  # zagrijavanje: indikatori se pune, ali se ništa stvarno ne trguje/broji
 
-        if decision == "buy" and not in_position:
-            fill = buy_fill_price(next_candle.open, slippage)
-            position_base = (cash * (1 - fee)) / fill
-            entry_cash = cash
-            cash = 0.0
-            in_position = True
-        elif decision == "sell" and in_position:
-            fill = sell_fill_price(next_candle.open, slippage)
-            cash = position_base * fill * (1 - fee)
-            position_base = 0.0
-            in_position = False
-            trades += 1
-            if cash > entry_cash:
-                winning_trades += 1
+        if not stopped_out:
+            if decision == "buy" and not in_position:
+                fill = buy_fill_price(next_candle.open, slippage)
+                fraction = min(1.0, risk_pct / stop_loss_pct) if (risk_pct and stop_loss_pct) else 1.0
+                invest_amount = cash * fraction
+                position_base = (invest_amount * (1 - fee)) / fill
+                entry_cash = invest_amount
+                entry_price = fill
+                cash -= invest_amount
+                in_position = True
+            elif decision == "sell" and in_position:
+                fill = sell_fill_price(next_candle.open, slippage)
+                proceeds = position_base * fill * (1 - fee)
+                cash += proceeds
+                position_base = 0.0
+                in_position = False
+                entry_price = None
+                trades += 1
+                if proceeds > entry_cash:
+                    winning_trades += 1
 
         # Equity = STVARNA gotovina da bi se pozicija likvidirala SADA (sell_fill_price + FEE), ne
         # sirova mark-to-market cijena - nađeno u ChatGPT-ovoj neovisnoj reviziji: bez ovoga
@@ -85,6 +123,7 @@ def run_generic_backtest(
         "params": params,
         "trades": trades,
         "winning_trades": winning_trades,
+        "stop_loss_exits": stop_loss_exits,
         "starting_balance": starting_balance,
         "final_balance": round(final_equity, 2),
         "max_drawdown_pct": round(max_drawdown * 100, 2),
@@ -133,6 +172,8 @@ def run_backtest(
     interval_min: int = 1440,
     fee: float = FEE,
     slippage: float = SLIPPAGE,
+    stop_loss_pct: float | None = None,
+    risk_pct: float | None = None,
 ) -> dict:
     if strategy_key == "buy_hold":
         candles = load_candles(conn, "binance", pair, interval_min, start_ts, end_ts)
@@ -181,7 +222,9 @@ def run_backtest(
             )
         series[spec["series_id"]] = points
 
-    return run_generic_backtest(candles, strategy_key, params, starting_balance, aux, series, start_ts, fee, slippage)
+    return run_generic_backtest(
+        candles, strategy_key, params, starting_balance, aux, series, start_ts, fee, slippage, stop_loss_pct, risk_pct
+    )
 
 
 def run_cost_sensitivity(

@@ -199,10 +199,14 @@ document.getElementById("btRunOne").addEventListener("click", async () => {
     alert("Parametri nisu valjan JSON.");
     return;
   }
+  const slRaw = document.getElementById("btStopLoss").value.trim();
+  const riskRaw = document.getElementById("btRiskPct").value.trim();
+  const stop_loss_pct = slRaw ? Number(slRaw) / 100 : null;
+  const risk_pct = riskRaw ? Number(riskRaw) / 100 : null;
   const r = await api("/api/backtest", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ strategy, pair, start_date, end_date, starting_balance, params }),
+    body: JSON.stringify({ strategy, pair, start_date, end_date, starting_balance, params, stop_loss_pct, risk_pct }),
   });
   renderBacktestTable([r], starting_balance);
   renderBacktestChart([r]);

@@ -967,6 +967,58 @@ referencu. Koristi se isključivo javni, read-only Coinbase cjenovni feed (bez k
 trading (ručni, odjeljak 9, i automatizirani, odjeljak 10) i backtest. "Automatizirano" u
 odjeljku 10 znači autonomna ODLUKA unutar simulacije, ne pravi nalog - vidi poglavlje iznad.
 
+## Provjera savjeta o upravljanju rizikom (korisnik je podijelio opći "Copilot" savjet o trgovanju)
+
+Korisnik je podijelio generički sažetak savjeta o trgovanju kriptovalutama (rizik 0,5-2% po
+trgovini, trend-following, price action, breakout, mean reversion, momentum, "Smart Money
+Concepts") i tražio da se to poštenо provjeri i primijeni kao "najbolji svjetski tim". Evo
+poštene procjene, razdvojeno na ono što je utemeljeno i što nije:
+
+**Utemeljeno, i VEĆ POKRIVENO u ovom projektu:**
+- Trend following (EMA20/50/200) → `ema_trend`, `trend_guard`, `vol_guarded_trend`, `dual_momentum`
+- Breakout → `donchian_breakout` (potvrđeno: puno lažnih breakouta, visok max pad u našim testovima - točno kako savjet upozorava)
+- Mean reversion (RSI, Bollinger) → `rsi_meanrev`, `stair_step_stochrsi` - **ALI naši stvarni testovi
+  pokazuju da su ovo najgore strategije koje imamo** (365-dnevni test: `rsi_meanrev` -45%, `stair_step_stochrsi`
+  -87%). Generički savjet ne kaže je li ovo stvarno profitabilno za kripto - naš podatak kaže NE.
+- Momentum (volumen, OBV, MACD) → `technical_composite`, `dual_momentum`
+
+**Utemeljeno, a NEDOSTAJALO nam je — popravljeno ovom prilikom:**
+- **Stop-loss i veličina pozicije prema riziku.** Niti jedna od 16 strategija do sad nije imala
+  TVRDI stop-loss - izlaz je bio isključivo na signal strategije. Ovo je stvarno najvažnija,
+  najbolje utemeljena stavka iz cijelog savjeta (standardna teorija upravljanja pozicijama, npr.
+  "fixed fractional position sizing" - Van Tharp i srodna literatura, ne nešto specifično za kripto).
+  Dodano u `app/backtest.py` (`run_generic_backtest`, parametri `stop_loss_pct`/`risk_pct`) i
+  dashboardu (odjeljak 3, "Prilagodi parametre jedne strategije").
+
+  **Pošteno testirano na istom 365-dnevnom/4-para skupu** (ema_trend, vol_guarded_trend,
+  trend_guard) - rezultat NIJE jednoznačno "sve je bolje s rizik managementom":
+  - Sam tvrdi stop-loss (bez promjene veličine pozicije) **blago POGORŠAVA sirov povrat** u ovom
+    uzorku (npr. vol_guarded_trend: $106,44 → $99,99-104,56 ovisno o širini stopa) - razlog je
+    whipsaw: stop istrese poziciju, cijena se vrati, strategija ponovno uđe, plati se dvostruka
+    naknada. Ovo je POŠTEN nalaz koji generički savjet ne spominje - stop-loss nije besplatan.
+  - Veličina pozicije prema riziku (npr. risk 1-2% uz stop 8%) **dramatično smanjuje max pad**
+    (s 11-18% na 2-5%) **ALI proporcionalno smanjuje i povrat** (npr. ema_trend: +10,6% → +1-2%)
+    - to je matematička nužnost, ne otkriće: manja pozicija = manji zamah u oba smjera. Nije
+      "besplatan ručak", pravi kompromis rizik/povrat.
+  - **Uzorak je malen** (5-25 trgovina) - ista zamka kao i prije, ne vjeruj ovom testu previše u
+    bilo kojem smjeru dok se ne nakupi više podataka iz uživo simulacije.
+
+**NIJE utemeljeno, NEĆE biti implementirano:**
+- **Smart Money Concepts (SMC/ICT)** - order blocks, Fair Value Gap, liquidity grab, BOS/CHOCH.
+  Problem nije da je "pogrešno", nego da pojmovi NISU precizno, jednoznačno mehanički definirani u
+  zajednici koja ih koristi - svaki trader drugačije označava "order block" na grafu. Kodirati ovo
+  kao da je jedna, dogovorena metoda bilo bi suprotno temeljnom pravilu ovog projekta (nikad ne
+  predstavljaj heuristiku kao više nego što jest). Nema ni ozbiljne recenzirane akademske potvrde
+  da "institucije love lov na stop-loss naloge" ima mjerljivu prediktivnu vrijednost iznad onoga
+  što već hvataju jednostavniji indikatori koje imamo.
+- **Pojedinačni svijećni obrasci** (Pin Bar, Engulfing, Inside Bar) kao samostalan signal - slaba
+  dokazana prednost u modernim likvidnim (pogotovo arbitriranim) tržištima prema akademskoj
+  literaturi o tehničkoj analizi; mogu biti dio konteksta, ne pouzdan samostalan okidač.
+
+**VWAP** (spomenut u savjetu kao jedan od ključnih indikatora) trenutno nemamo u `app/indicators.py`
+- nije dodano ovom prilikom (nizak prioritet, prvenstveno koristnije za kvalitetu izvršenja unutar
+  dana nego kao samostalan dnevni signal), ali ostaje kandidat za budućnost.
+
 ## Kako analizirati rezultate dugoročne uživo simulacije
 
 Korisnik je pokrenuo paralelno niz paper trading / auto-trader / whale-mirror runova (25.11.2026.)

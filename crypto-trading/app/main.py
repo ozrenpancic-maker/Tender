@@ -89,6 +89,8 @@ class BacktestRequest(BaseModel):
     params: dict = {}
     starting_balance: float = 500.0
     interval_min: int = 1440
+    stop_loss_pct: float | None = None  # npr. 0.08 = 8% - vidi README "Provjera savjeta o upravljanju rizikom"
+    risk_pct: float | None = None  # npr. 0.01 = 1% kapitala po trgovini - treba stop_loss_pct da ima smisla
 
 
 @app.post("/api/backtest")
@@ -102,7 +104,8 @@ def backtest(req: BacktestRequest):
     conn = db.get_connection()
     try:
         result = run_backtest(
-            conn, req.strategy, req.pair, start_ts, end_ts, req.params, req.starting_balance, req.interval_min
+            conn, req.strategy, req.pair, start_ts, end_ts, req.params, req.starting_balance, req.interval_min,
+            stop_loss_pct=req.stop_loss_pct, risk_pct=req.risk_pct,
         )
         conn.execute(
             "INSERT INTO backtest_run (strategy, params_json, pair, start_date, end_date, result_json, created_at)"
