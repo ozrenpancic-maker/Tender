@@ -32,6 +32,17 @@ from app.strategies.base import StrategyContext
 
 DEFAULT_STRATEGIES = ["ema_trend", "trend_guard", "vol_guarded_trend"]
 DEFAULT_PAIRS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT"]
+# Za usporedbu "zašto ne sve strategije odjednom" (vidi README) - sve trend strategije koje rade
+# samo na cijeni. Ostale cjenovne (rsi_meanrev, dip_buy_volume, stair_step_*) su kontra/swing.
+TREND_STRATEGIES = [
+    "sma_crossover", "technical_composite", "trend_guard", "ema_trend",
+    "confirmed_trend", "donchian_breakout", "dual_momentum", "vol_guarded_trend",
+]
+
+
+def price_only_strategies() -> list[str]:
+    """Sve strategije kojima treba samo cijena (portfelj ne podržava makro/derivate podatke)."""
+    return [k for k, v in GENERIC_STRATEGIES.items() if not v.get("needs_aux") and not v.get("needs_series")]
 VOL_LOOKBACK_DAYS = 30
 DAYS_PER_YEAR = 365  # kripto trguje i vikendom
 WARMUP_DAYS = 260
@@ -153,6 +164,7 @@ def run_portfolio_backtest(
     rebalance_drift: float = 1.0,
     fee: float = FEE,
     slippage: float = SLIPPAGE,
+    min_trade_fraction: float = MIN_TRADE_FRACTION,
 ) -> dict:
     decisions = compute_target_weights(candles_by_pair, strategies, start_ts, target_vol)
     if len(decisions) < 2:
@@ -181,7 +193,7 @@ def run_portfolio_backtest(
             tgt_w = targets[p]
             signal_changed = signals[p] != last_signal[p]
             drifted = abs(tgt_w - cur_w) > rebalance_drift * max(tgt_w, cur_w)
-            if (signal_changed or drifted) and abs(tgt_w - cur_w) * value >= MIN_TRADE_FRACTION * value:
+            if (signal_changed or drifted) and abs(tgt_w - cur_w) >= min_trade_fraction:
                 orders[p] = (tgt_w - cur_w) * value
             elif tgt_w == 0 and units[p] > 0:
                 orders[p] = -units[p] * opens[p]  # izađi potpuno kad signal padne na nulu
@@ -222,6 +234,7 @@ def run_portfolio_backtest(
         "pairs": list(candles_by_pair),
         "target_vol": target_vol,
         "rebalance_drift": rebalance_drift,
+        "min_trade_fraction": min_trade_fraction,
         "starting_balance": starting_balance,
         "trades": trades,
         "fees_paid": round(fees_paid, 2),

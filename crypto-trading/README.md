@@ -1218,6 +1218,41 @@ Po godinama (portfelj bez target_vol / buy&hold): 2021 +117% / +220%, **2022 −
   (Sharpe 0,94-0,98), izabrano 1,0 jer manje trgovanja, ne jer je "pobijedio".
 - Long-only spot, bez shortanja - u medvjeđem tržištu najbolje što portfelj može je biti u gotovini.
 
+### Zašto ne SVE strategije odjednom? (testirano na korisnikovo pitanje)
+
+Isti portfeljni engine, isti podaci ($1000, BTC/ETH/SOL/XRP). Testirano je 12 strategija kojima
+treba samo cijena; 4 makro/derivatne strategije trebaju podatke kojih nema za cijelo razdoblje.
+Dashboard odjeljak 12 sad ima izbor "Strategije" da se ovo može ponoviti.
+
+| 2021-04 → 2025-11 (pošteni prozor) | Završno | Sharpe | Max pad | 2022 | Trgovina |
+|---|---|---|---|---|---|
+| Buy & hold | $3206 | 0,71 | 89,3% | −84% | - |
+| **Naše 3 trend** | $3654 | **0,98** | 37,7% | −17% | 516 |
+| **Svih 12 cjenovnih** | $3189 | 0,92 | 40,5% | −27% | 1816 |
+| Svih 8 trend | $2913 | 0,90 | 38,3% | −18% | 1886 |
+| Samo 4 kontra/swing | $4515 | 0,89 | 61,5% | −50% | 225 |
+
+Na cijelom razdoblju do 2026-11 razlika je veća (naše 3: Sharpe 0,92; svih 12: 0,73), ali taj
+prozor uključuje godinu na kojoj su naše 3 izabrane, pa je ta usporedba pristrana U NAŠU KORIST.
+
+Zaključci:
+- **Kombinacija svih nije loša ideja - radi.** Svih 12 bez ikakvog biranja i dalje jasno pobjeđuje
+  buy&hold po riziku (Sharpe 0,92 naspram 0,71, pad 40% naspram 89%). Na poštenom prozoru je
+  razlika prema "naše 3" mala (0,98 naspram 0,92) i dio te prednosti je vjerojatno upravo
+  naknadno biranje.
+- **Zašto ipak lošije:** 4 kontra/swing strategije (`rsi_meanrev`, `dip_buy_volume`,
+  `stair_step_*`) su na DNEVNIM podacima uglavnom "kupi i drži" (izloženost 74-99%, neke samo 4
+  trgovine u 4,6 godina). Kad se umiješaju, vraćaju upravo rizik pada koji trend sustav izbjegava
+  (2022: −27% umjesto −17%). Trend i "kupi pad" su suprotne filozofije - djelomično se poništavaju.
+- `dual_momentum` sam po sebi je loš (1395 trgovina, Sharpe 0,10) i razvodnjava ansambl.
+- **Više strategija ≠ više diverzifikacije.** Svih 12 gleda istu cijenu istih 4 coina, pa su
+  jako međusobno korelirane. Prava diverzifikacija dolazi od RAZLIČITIH tržišta/podataka, ne od
+  više varijacija istog signala.
+- Provjerena i sumnja da je problem u troškovima (svih 12 radi 3,5× više trgovina): minimalni prag
+  trgovine 5% umjesto 1% smanjuje trgovine 6× (1816 → 298), ali rezultat ostaje isti (Sharpe
+  0,92 → 0,93). Troškovi NISU uzrok. Zadani prag ostaje 1% (nije štiman); parametar
+  `min_trade_fraction` je dodan u `run_portfolio_backtest`.
+
 ### Provjera look-ahead biasa
 
 `app/checks.py:check_portfolio_no_lookahead` mijenja budućnost na svim parovima odjednom (dvije

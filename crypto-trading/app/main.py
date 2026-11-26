@@ -167,9 +167,13 @@ class PortfolioBacktestRequest(BaseModel):
 
 @app.get("/api/portfolio-backtest/defaults")
 def portfolio_backtest_defaults():
-    from app.portfolio_backtest import DEFAULT_PAIRS, DEFAULT_STRATEGIES
+    from app.portfolio_backtest import DEFAULT_PAIRS, DEFAULT_STRATEGIES, TREND_STRATEGIES, price_only_strategies
 
-    return {"pairs": DEFAULT_PAIRS, "strategies": DEFAULT_STRATEGIES}
+    return {
+        "pairs": DEFAULT_PAIRS,
+        "strategies": DEFAULT_STRATEGIES,
+        "strategy_sets": {"default": DEFAULT_STRATEGIES, "all_price_only": price_only_strategies(), "trend": TREND_STRATEGIES},
+    }
 
 
 @app.post("/api/portfolio-backtest")

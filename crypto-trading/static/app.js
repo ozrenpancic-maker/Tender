@@ -376,11 +376,14 @@ document.getElementById("pfRun").addEventListener("click", async () => {
   const tv = document.getElementById("pfTargetVol").value;
   const balance = Number(document.getElementById("pfBalance").value);
   try {
+    const defaults = await api("/api/portfolio-backtest/defaults");
+    const strategies = defaults.strategy_sets[document.getElementById("pfStrategySet").value];
     const r = await api("/api/portfolio-backtest", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         pairs: document.getElementById("pfPairs").value.split(",").map((p) => p.trim()).filter(Boolean),
+        strategies,
         start_date: document.getElementById("pfStart").value,
         end_date: document.getElementById("pfEnd").value,
         starting_balance: balance,
